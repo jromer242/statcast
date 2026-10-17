@@ -1,0 +1,11 @@
+.venv/
+logs/
+data/raw/
+data/processed/
+*.duckdb
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+
+# Notebooks stay local
+*.ipynb
