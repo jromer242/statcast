@@ -1,0 +1,9 @@
+# dbt looks for profiles.yml in the current directory first, so running dbt from
+# this folder uses this file instead of ~/.dbt/profiles.yml.
+statcast:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/statcast.duckdb
+      threads: 4

@@ -1,0 +1,79 @@
+models:
+  - name: stg_savant__pitches
+    description: >
+      One row per pitch from Baseball Savant, deduplicated across overlapping raw pulls.
+      Includes spring training (game_type = 'S') and postseason; filter downstream.
+      Field definitions: https://baseballsavant.mlb.com/csv-docs
+    columns:
+      - name: pitch_id
+        description: Surrogate key, "game_pk-at_bat_number-pitch_number".
+        data_tests:
+          - unique
+          - not_null
+
+      - name: game_pk
+        description: MLB game ID.
+        data_tests: [not_null]
+
+      - name: game_date
+        data_tests: [not_null]
+
+      - name: game_type
+        description: R regular, F wild card, D division series, L LCS, W World Series, S spring training, E exhibition, A All-Star.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [R, F, D, L, W, S, E, A]
+
+      - name: batter_id
+        data_tests: [not_null]
+
+      - name: pitcher_id
+        data_tests: [not_null]
+
+      - name: pitcher_name
+        description: Pitcher's name. Savant's raw column is called player_name.
+
+      - name: inning_topbot
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Top, Bot]
+
+      - name: batter_stand
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [L, R]
+
+      - name: pitcher_throws
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [L, R]
+
+      - name: pitch_result_type
+        description: B ball, S strike (including fouls), X ball in play.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [B, S, X]
+
+      - name: pa_event
+        description: Outcome of the plate appearance (single, strikeout, ...). Null on every pitch except the last of a PA.
+
+      - name: xwoba
+        description: Expected wOBA from launch speed and angle. Only on batted balls.
+
+      - name: delta_run_exp
+        description: Change in run expectancy caused by this pitch. An outcome; leaks if used as a feature for the same pitch.
+
+      - name: pitcher_days_until_next_game
+        description: Days until the pitcher's next game. Known only in hindsight; never use as a model input.
+
+      - name: _source_file
+        description: Raw Parquet file this row came from.
+
+      - name: _ingested_at
+        description: When ingest.py pulled this row (UTC). Null for files written before this column was added.

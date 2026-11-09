@@ -1,0 +1,15 @@
+sources:
+  - name: savant
+    description: Raw Baseball Savant Statcast pulls, written as Parquet by scripts/ingest.py.
+    tables:
+      - name: statcast_raw
+        description: >
+          One row per pitch per pull. Files can overlap (re-pulled date ranges), so the
+          same pitch may appear more than once; staging deduplicates. `season` comes from
+          the season=YYYY folder name and `filename` records which file a row came from.
+        config:
+          external_location: >-
+            read_parquet('{{ var("raw_statcast_glob") }}',
+                         hive_partitioning = true,
+                         union_by_name = true,
+                         filename = true)

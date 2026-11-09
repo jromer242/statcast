@@ -82,6 +82,8 @@ def fetch(start: dt.date, end: dt.date) -> pd.DataFrame:
 
 
 def write_raw(df: pd.DataFrame, start: dt.date, end: dt.date) -> Path:
+    # Overlapping pulls put the same pitch in more than one file; dbt staging keeps the newest copy.
+    df["_ingested_at"] = pd.Timestamp.now(tz="UTC")
     out_dir = RAW_DIR / f"season={start.year}"
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"statcast_{start}_{end}.parquet"

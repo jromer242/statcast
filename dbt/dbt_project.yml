@@ -1,0 +1,21 @@
+name: statcast
+version: "1.0.0"
+profile: statcast
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Raw Parquet written by scripts/ingest.py, relative to this dbt/ folder.
+  raw_statcast_glob: "../data/raw/statcast/**/*.parquet"
+
+models:
+  statcast:
+    staging:
+      # Table, not view: a view would store the relative Parquet path and break when
+      # queried from anywhere but dbt/ (e.g. notebooks). It also dedupes once, at build.
+      +materialized: table
