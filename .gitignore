@@ -7,8 +7,9 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 
-# Notebooks stay local
+# Notebooks stay local, except teaching notebooks linked from the README
 *.ipynb
+!notebooks/06_wall_distance_auc.ipynb
 
 # dbt build output
 dbt/target/
