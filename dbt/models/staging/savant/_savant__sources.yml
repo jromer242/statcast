@@ -28,3 +28,32 @@ sources:
                       union_by_name = true,
                       filename = true,
                       sample_size = -1)
+
+      - name: park_factors_raw
+        description: >
+          Savant park factor indexes (100 = league average), written by
+          scripts/ingest_park_factors.py. One line per park per season per rolling window
+          (1 or 3 seasons) per batter side (All, L, R). Every value arrives as a string.
+          Computed from that season's batted balls, so these describe the past.
+        config:
+          external_location: >-
+            read_json('{{ var("raw_savant_park_factors_glob") }}',
+                      format = 'newline_delimited',
+                      hive_partitioning = true,
+                      union_by_name = true,
+                      filename = true,
+                      sample_size = -1)
+
+      - name: park_environment_raw
+        description: >
+          Savant's "extra distance" view (2016+): how far a fly ball carries in each park
+          relative to average, split into elevation, temperature, roof and other
+          environment. One line per park per season. Every value arrives as a string.
+        config:
+          external_location: >-
+            read_json('{{ var("raw_savant_park_environment_glob") }}',
+                      format = 'newline_delimited',
+                      hive_partitioning = true,
+                      union_by_name = true,
+                      filename = true,
+                      sample_size = -1)

@@ -17,6 +17,9 @@ vars:
   # Raw JSON lines written by scripts/ingest_venues.py and scripts/ingest_park_dimensions.py.
   raw_mlb_venues_glob: "../data/raw/mlb/venues/**/*.jsonl"
   raw_savant_park_dimensions_glob: "../data/raw/savant/park_dimensions/**/*.jsonl"
+  # Raw JSON lines written by scripts/ingest_park_factors.py.
+  raw_savant_park_factors_glob: "../data/raw/savant/park_factors/**/*.jsonl"
+  raw_savant_park_environment_glob: "../data/raw/savant/park_environment/**/*.jsonl"
 
 models:
   statcast:

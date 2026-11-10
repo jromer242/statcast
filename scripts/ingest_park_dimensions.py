@@ -18,15 +18,13 @@ and `is_diff_configuration` flags parks whose walls moved (e.g. Camden Yards in 
 
 import argparse
 import datetime as dt
-import json
 import logging
-import re
 import sys
 import time
 
 import requests
 
-from common import PROJECT_ROOT, USER_AGENT, setup_logging, write_jsonl
+from common import PROJECT_ROOT, USER_AGENT, extract_savant_data, setup_logging, write_jsonl
 
 RAW_DIR = PROJECT_ROOT / "data" / "raw" / "savant" / "park_dimensions"
 URL = "https://baseballsavant.mlb.com/leaderboard/statcast-park-factors"
@@ -47,21 +45,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def extract_data(html: str) -> list[dict]:
-    """Return the `var data = [...]` array embedded in a Savant leaderboard page."""
-    match = re.search(r"var data\s*=\s*", html)
-    if match is None:
-        raise ValueError("`var data =` not found; Savant may have changed the page layout")
-    # raw_decode reads exactly one JSON value starting at that position and ignores the rest
-    data, _ = json.JSONDecoder().raw_decode(html, match.end())
-    return data
-
-
 def fetch_season(session: requests.Session, season: int) -> list[dict]:
     log.info("Fetching park dimensions for %s", season)
     r = session.get(URL, params={"type": "dimensions", "year": season}, timeout=60)
     r.raise_for_status()
-    rows = extract_data(r.text)
+    rows = extract_savant_data(r.text)
 
     other_seasons = {row.get("season_id") for row in rows} - {season}
     if other_seasons:

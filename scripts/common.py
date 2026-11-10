@@ -4,6 +4,7 @@
 import datetime as dt
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -42,3 +43,16 @@ def write_jsonl(records: list[dict], path: Path) -> Path:
             f.write(json.dumps({**r, "_ingested_at": ingested_at}) + "\n")
     tmp.replace(path)
     return path
+
+
+def extract_savant_data(html: str) -> list[dict]:
+    """Return the `var data = [...]` array embedded in a Baseball Savant leaderboard page.
+
+    Savant's leaderboards have no JSON endpoint; the page's data sits in a <script> tag.
+    """
+    match = re.search(r"var data\s*=\s*", html)
+    if match is None:
+        raise ValueError("`var data =` not found; Savant may have changed the page layout")
+    # raw_decode reads exactly one JSON value starting at that position and ignores the rest
+    data, _ = json.JSONDecoder().raw_decode(html, match.end())
+    return data

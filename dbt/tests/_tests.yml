@@ -26,3 +26,10 @@ data_tests:
       row for that season. One-off neutral sites are expected to be missing and are
       excluded by the 20-game threshold. Fails when ingest_park_dimensions.py wasn't run
       for a season.
+
+  - name: assert_park_factor_window_ends_in_season
+    description: >
+      Every Savant park factor window ends in its labeled season and spans
+      `rolling_years` seasons. dim_venue_seasons' leakage rule (use season - 1) depends
+      on this; if Savant changed how it labels windows, the mart would use future data.
+
