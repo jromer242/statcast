@@ -6,3 +6,11 @@ data_tests:
       stg_mlb__games, or whose official_date differs from Statcast's game_date.
       Usual causes: ingest_schedule.py wasn't run for a season that ingest.py loaded,
       or the schedule dedupe stopped producing one row per game_pk.
+
+  - name: assert_game_has_one_venue
+    description: >
+      Fails if a game with pitches thrown was played in more than one venue, e.g. a
+      suspended game resumed in a different park. stg_mlb__games keeps one venue_id per
+      game_pk, so pitches from the first part would get the wrong park. Runs on the raw
+      schedule; ignores Postponed and Cancelled rows. If it fails, venues have to be
+      assigned per part of the game instead of per game_pk.
