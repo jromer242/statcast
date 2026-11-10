@@ -20,3 +20,9 @@ data_tests:
       Every game in stg_mlb__games has a stg_mlb__venues row for its venue_id and season.
       Fails when ingest_venues.py wasn't run for a season that ingest_schedule.py loaded.
 
+  - name: assert_home_parks_have_dimensions
+    description: >
+      Every venue with 20+ completed games in a season has a stg_savant__park_dimensions
+      row for that season. One-off neutral sites are expected to be missing and are
+      excluded by the 20-game threshold. Fails when ingest_park_dimensions.py wasn't run
+      for a season.

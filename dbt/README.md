@@ -6,15 +6,18 @@ Turns raw files from `scripts/` into clean, tested tables in `data/statcast.duck
 scripts/ingest.py                  -> data/raw/statcast/season=YYYY/*.parquet            -> stg_savant__pitches
 scripts/ingest_schedule.py         -> data/raw/mlb/schedule/season=YYYY/*.jsonl          -> stg_mlb__games
 scripts/ingest_venues.py           -> data/raw/mlb/venues/season=YYYY/*.jsonl            -> stg_mlb__venues
+scripts/ingest_park_dimensions.py  -> data/raw/savant/park_dimensions/season=YYYY/*.jsonl -> stg_savant__park_dimensions
 ```
 
 How they join:
 
 ```
 stg_savant__pitches --game_pk--> stg_mlb__games --(venue_id, season)--> stg_mlb__venues
+                                                \--(venue_id, season)--> stg_savant__park_dimensions
 ```
 
-Venues are **snapshots per season** (walls move, capacity changes), so always join them on `(venue_id, season)`, never `venue_id` alone.
+Venues and park dimensions are **snapshots per season** (walls move, capacity changes), so
+always join them on `(venue_id, season)`, never `venue_id` alone.
 
 ## Loading a season
 
@@ -25,10 +28,11 @@ project root:
 .venv/bin/python scripts/ingest.py --start 2025-03-01 --end 2025-11-05
 .venv/bin/python scripts/ingest_schedule.py --season 2025
 .venv/bin/python scripts/ingest_venues.py --season 2025
+.venv/bin/python scripts/ingest_park_dimensions.py --season 2025   # 2015 or later
 ```
 
 Then `dbt build` from this folder. During the season, re-run the schedule daily (games get
-postponed and resumed); venues only change between seasons.
+postponed and resumed); venues and park dimensions only change between seasons.
 
 ## Running it
 
@@ -86,6 +90,13 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 | `venue_id`, `season`, `venue_name` not null | Join keys and a readable label. |
 | `roof_type` in Open, Retractable, Dome; `turf_type` in Grass, Artificial Turf | Catches API encoding changes before they split a feature into two spellings. |
 
+### `stg_savant__park_dimensions` (one row per home park per season)
+
+| Test | Why it matters |
+|---|---|
+| `venue_id || '-' || season` unique | One measurement per park per season. |
+| `venue_id`, `season`, `distance_cf_ft`, `height_highest_ft` not null | A park row without measurements is as bad as no row. |
+
 ### `savant_field_dictionary` (seed)
 
 | Test | Why it matters |
@@ -100,6 +111,7 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 | `assert_statcast_games_have_one_schedule_row` | **Join coverage.** Every regular-season and postseason Statcast game must match exactly one `stg_mlb__games` row on the same date. Catches a season loaded by `ingest.py` but not `ingest_schedule.py`, a broken schedule dedupe, or a date mismatch. Spring training is excluded because the schedule ingest doesn't pull it. Verified to fail (2,477 rows) with the 2025 schedule file removed. |
 | `assert_game_has_one_venue` | A suspended game resumed in a different park would get a single `venue_id` (the dedupe keeps the latest row), so day-one pitches would get the wrong park. Checks the raw schedule, ignoring Postponed and Cancelled rows (no pitches thrown). Never happened in 2024–2026; if it fails, venues must be assigned per part of the game, not per `game_pk`. |
 | `assert_every_game_has_venue_season` | Every game has a `stg_mlb__venues` row for its venue **and season**. Catches a season loaded by `ingest_schedule.py` but not `ingest_venues.py`. Verified to fail (2,473 rows) with the 2024 venues file removed. |
+| `assert_home_parks_have_dimensions` | Every venue with 20+ completed games in a season (a real home park) has Savant measured dimensions that season. One-off neutral sites (Tokyo, London, Mexico City, Seoul, Williamsport) are expected to be missing: about 0.1–0.3% of pitches per season. Verified to fail (30 parks) with the 2026 file removed. |
 
 ## Adding a test
 

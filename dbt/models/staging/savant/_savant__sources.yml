@@ -13,3 +13,18 @@ sources:
                          hive_partitioning = true,
                          union_by_name = true,
                          filename = true)
+
+      - name: park_dimensions_raw
+        description: >
+          One line per MLB home park per season from the "dimensions" view of Savant's park
+          factors leaderboard, written by scripts/ingest_park_dimensions.py. One-off neutral
+          sites aren't included. Each run overwrites the season's file, so
+          (venue_id, season_id) is unique. Available from 2015.
+        config:
+          external_location: >-
+            read_json('{{ var("raw_savant_park_dimensions_glob") }}',
+                      format = 'newline_delimited',
+                      hive_partitioning = true,
+                      union_by_name = true,
+                      filename = true,
+                      sample_size = -1)

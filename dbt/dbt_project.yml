@@ -14,8 +14,9 @@ vars:
   raw_statcast_glob: "../data/raw/statcast/**/*.parquet"
   # Raw JSON lines written by scripts/ingest_schedule.py.
   raw_mlb_schedule_glob: "../data/raw/mlb/schedule/**/*.jsonl"
-  # Raw JSON lines written by scripts/ingest_venues.py.
+  # Raw JSON lines written by scripts/ingest_venues.py and scripts/ingest_park_dimensions.py.
   raw_mlb_venues_glob: "../data/raw/mlb/venues/**/*.jsonl"
+  raw_savant_park_dimensions_glob: "../data/raw/savant/park_dimensions/**/*.jsonl"
 
 models:
   statcast:

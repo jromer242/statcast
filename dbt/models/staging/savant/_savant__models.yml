@@ -77,3 +77,32 @@ models:
 
       - name: _ingested_at
         description: When ingest.py pulled this row (UTC). Null for files written before this column was added.
+
+  - name: stg_savant__park_dimensions
+    description: >
+      One row per MLB home park per season: Savant's measured fence distances and wall
+      heights. Prefer these over the posted distances in stg_mlb__venues. Join on
+      (venue_id, season). One-off neutral sites have no row. Available from 2015.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "venue_id || '-' || season"
+    columns:
+      - name: venue_id
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: walls_changed
+        description: True when the park's walls moved or changed height since the previous season.
+      - name: distance_cf_ft
+        description: Measured distance to the center-field wall, feet.
+        data_tests: [not_null]
+      - name: height_highest_ft
+        description: Tallest point of the outfield wall, feet (Fenway's Green Monster is about 37).
+        data_tests: [not_null]
+      - name: venue_name
+        description: Savant's current name for the park, even in past seasons. Use stg_mlb__venues for the name at the time.
+      - name: avg_hr_distance_ft
+        description: >
+          Average home run distance in this park this season. An outcome of the same
+          season's batted balls: leaks if used as a feature for that season.
