@@ -1,0 +1,120 @@
+field,stg_column,description,source
+pitch_type,pitch_type,The type of pitch derived from Statcast.,savant
+game_date,game_date,Date of the Game.,savant
+release_speed,release_speed,"Pitch velocity in MPH. Values from 2008-16 are via PitchFX, and adjusted to roughly out-of-hand release point. All velocities from 2017 and beyond are Statcast, which are reported out-of-hand. All velocities are thus on the same scale.",savant
+release_pos_x,release_pos_x,Horizontal Release Position of the ball measured in feet from the catcher's perspective.,savant
+release_pos_z,release_pos_z,Vertical Release Position of the ball measured in feet from the catcher's perspective.,savant
+player_name,pitcher_name,Player's name tied to the event of the search.,savant
+batter,batter_id,MLB Player Id tied to the play event.,savant
+pitcher,pitcher_id,MLB Player Id tied to the play event.,savant
+events,pa_event,Event of the resulting Plate Appearance.,savant
+description,pitch_description,Description of the resulting pitch.,savant
+spin_dir,,* Deprecated field from the old tracking system.,savant
+spin_rate_deprecated,,* Deprecated field from the old tracking system. Replaced by release_spin,savant
+break_angle_deprecated,,* Deprecated field from the old tracking system.,savant
+break_length_deprecated,,* Deprecated field from the old tracking system.,savant
+zone,zone,Zone location of the ball when it crosses the plate from the catcher's perspective.,savant
+des,play_description,Plate appearance description from game day.,savant
+game_type,game_type,"Type of Game. E = Exhibition, S = Spring Training, R = Regular Season, F = Wild Card, D = Divisional Series, L = League Championship Series, W = World Series",savant
+stand,batter_stand,Side of the plate batter is standing.,savant
+p_throws,pitcher_throws,Hand pitcher throws with.,savant
+home_team,home_team,Abbreviation of home team.,savant
+away_team,away_team,Abbreviation of away team.,savant
+type,pitch_result_type,"Short hand of pitch result. B = ball, S = strike, X = in play.",savant
+hit_location,hit_location,Position of first fielder to touch the ball.,savant
+bb_type,batted_ball_type,"Batted ball type, ground_ball, line_drive, fly_ball, popup.",savant
+balls,balls,Pre-pitch number of balls in count.,savant
+strikes,strikes,Pre-pitch number of strikes in count.,savant
+game_year,season,Year game took place.,savant
+pfx_x,pfx_x,Horizontal movement in feet from the catcher's perspective.,savant
+pfx_z,pfx_z,Vertical movement in feet from the catcher's perpsective.,savant
+plate_x,plate_x,"Horizontal position of the ball when it crosses home plate from the catcher's perspective. Through 2025, this was front-of-plate. From 2026 on, this is middle-of-plate to align with the ABS system.",savant
+plate_z,plate_z,"Vertical position of the ball when it crosses home plate from the catcher's perspective. Through 2025, this was front-of-plate. From 2026 on, this is middle-of-plate to align with the ABS system.",savant
+on_3b,runner_on_3b_id,Pre-pitch MLB Player Id of Runner on 3B.,savant
+on_2b,runner_on_2b_id,Pre-pitch MLB Player Id of Runner on 2B.,savant
+on_1b,runner_on_1b_id,Pre-pitch MLB Player Id of Runner on 1B.,savant
+outs_when_up,outs_when_up,Pre-pitch number of outs.,savant
+inning,inning,Pre-pitch inning number.,savant
+inning_topbot,inning_topbot,Pre-pitch top or bottom of inning.,savant
+hc_x,hc_x,Hit coordinate X of batted ball.,savant
+hc_y,hc_y,Hit coordinate Y of batted ball.,savant
+tfs_deprecated,,* Deprecated field from old tracking system.,savant
+tfs_zulu_deprecated,,* Deprecated field from old tracking system.,savant
+fielder_2,catcher_id,Pre-pitch MLB Player Id of Catcher.,savant
+umpire,,* Deprecated field from old tracking system.,savant
+sv_id,,Non-unique Id of play event per game.,savant
+vx0,vx0,"The velocity of the pitch, in feet per second, in x-dimension, determined at y=50 feet.",savant
+vy0,vy0,"The velocity of the pitch, in feet per second, in y-dimension, determined at y=50 feet.",savant
+ax,ax,"The acceleration of the pitch, in feet per second per second, in x-dimension, determined at y=50 feet.",savant
+ay,ay,"The acceleration of the pitch, in feet per second per second, in y-dimension, determined at y=50 feet.",savant
+az,az,"The acceleration of the pitch, in feet per second per second, in z-dimension, determined at y=50 feet.",savant
+sz_top,sz_top,"Top of the batter's strike zone set by the operator when the ball is halfway to the plate. Through 2025, top of the batter's strike zone set by the operator when the ball is halfway to the plate. From 2026 on, this is the top of the batter's ABS-defined strike zone.",savant
+sz_bot,sz_bot,"Bottom of the batter's strike zone set by the operator when the ball is halfway to the plate. Through 2025, bottom of the batter's strike zone set by the operator when the ball is halfway to the plate. From 2026 on, this is the bottom of the batter's ABS-defined strike zone.",savant
+hit_distance_sc,hit_distance,Projected hit distance of the batted ball.,savant
+launch_speed,launch_speed,"Exit velocity of the batted ball as tracked by Statcast. For the limited subset of batted balls not tracked directly, estimates are included based on the process described here .",savant
+launch_angle,launch_angle,"Launch angle of the batted ball as tracked by Statcast. For the limited subset of batted balls not tracked directly, estimates are included based on the process described here .",savant
+effective_speed,effective_speed,Derived speed based on the the extension of the pitcher's release.,savant
+release_spin_rate,release_spin_rate,Spin rate of pitch tracked by Statcast.,savant
+release_extension,release_extension,Release extension of pitch in feet as tracked by Statcast.,savant
+game_pk,game_pk,Unique Id for Game.,savant
+fielder_3,first_base_id,MLB Player Id for 1B.,savant
+fielder_4,second_base_id,MLB Player Id for 2B.,savant
+fielder_5,third_base_id,MLB Player Id for 3B.,savant
+fielder_6,shortstop_id,MLB Player Id for SS.,savant
+fielder_7,left_field_id,MLB Player Id for LF.,savant
+fielder_8,center_field_id,MLB Player Id for CF.,savant
+fielder_9,right_field_id,MLB Player Id for RF.,savant
+release_pos_y,release_pos_y,Release position of pitch measured in feet from the catcher's perspective.,savant
+estimated_ba_using_speedangle,xba,Estimated Batting Avg based on launch angle and exit velocity.,savant
+estimated_woba_using_speedangle,xwoba,Estimated wOBA based on launch angle and exit velocity.,savant
+woba_value,woba_value,wOBA value based on result of play.,savant
+woba_denom,woba_denom,wOBA denominator based on result of play.,savant
+babip_value,babip_value,BABIP value based on result of play.,savant
+iso_value,iso_value,ISO value based on result of play.,savant
+launch_speed_angle,launch_speed_angle,Launch speed/angle zone based on launch angle and exit velocity. | Weak | Topped | Under | Flare/Burner | Solid Contact | Barrel,savant
+at_bat_number,at_bat_number,Plate appearance number of the game.,savant
+pitch_number,pitch_number,Total pitch number of the plate appearance.,savant
+pitch_name,pitch_name,The name of the pitch derived from the Statcast Data.,savant
+home_score,home_score,Pre-pitch home score,savant
+away_score,away_score,Pre-pitch away score,savant
+bat_score,bat_score,Pre-pitch bat team score,savant
+fld_score,fld_score,Pre-pitch field team score,savant
+post_home_score,post_home_score,Post-pitch home score,savant
+post_away_score,post_away_score,Post-pitch away score,savant
+post_bat_score,post_bat_score,Post-pitch bat team score,savant
+if_fielding_alignment,if_fielding_alignment,Infield fielding alignment at the time of the pitch.,savant
+of_fielding_alignment,of_fielding_alignment,Outfield fielding alignment at the time of the pitch.,savant
+spin_axis,spin_axis,"The Spin Axis in the 2D X-Z plane in degrees from 0 to 360, such that 180 represents a pure backspin fastball and 0 degrees represents a pure topspin (12-6) curveball",savant
+delta_home_win_exp,delta_home_win_exp,The change in Win Expectancy before the Plate Appearance and after the Plate Appearance,savant
+delta_run_exp,delta_run_exp,The change in Run Expectancy before the Pitch and after the Pitch,savant
+hyper_speed,hyper_speed,"Savant display name: Adjusted EV. Adjusted Exit Velocity sets every batted ball hit below 88 mph as 88 mph, otherwise it uses the actual Exit Velocity",savant
+home_score_diff,home_score_diff,Home score minus Away score,savant
+bat_score_diff,bat_score_diff,Batting team score less Pitching team score,savant
+home_win_exp,home_win_exp,Home team win expectancy,savant
+bat_win_exp,bat_win_exp,Bat team win expectancy,savant
+age_pit_legacy,,pitcher age on 6/30,savant
+age_bat_legacy,,batter age on 6/30,savant
+age_pit,pitcher_age,pitcher age on 12/31,savant
+age_bat,batter_age,batter age on 12/31,savant
+n_thruorder_pitcher,pitcher_times_through_order,pitcher times through the order,savant
+n_priorpa_thisgame_player_at_bat,batter_prior_pa_this_game,number of prior PAs in this game for this batter,savant
+pitcher_days_since_prev_game,pitcher_days_since_prev_game,number of days since pitcher's last game,savant
+batter_days_since_prev_game,batter_days_since_prev_game,number of days since batter's last game,savant
+pitcher_days_until_next_game,pitcher_days_until_next_game,number of days until the pitcher's next game,savant
+batter_days_until_next_game,batter_days_until_next_game,number of days until the batter's next game,savant
+api_break_z_with_gravity,break_z_with_gravity,Vertical break with gravity included,savant
+api_break_x_arm,break_x_arm_side,"Break, in inches, of a pitch to the pitcher's arm side.",savant
+api_break_x_batter_in,break_x_batter_in,"Break, in inches, of a pitch toward the batter's side of plate.",savant
+arm_angle,arm_angle,The angle between a line parallel to the ground and a l line extending from the location of the pitcher's throwing shoulder and the location of the ball at the time of the pitch.,savant
+attack_angle,attack_angle,"Attack Angle measures the vertical angle of the direction in which the sweet spot of the bat is traveling as it impacts the ball, as compared to the ground.",savant
+attack_direction,attack_direction,"Attack Direction measures the horizontal angle of the direction in which the sweet spot of the bat is traveling as it impacts the ball, as compared to a line from home plate to straightaway center field.",savant
+swing_path_tilt,swing_path_tilt,"The vertical angular orientation of the ""plane"" of the swing, as compared to the ground, defined by the path of the bat in the 40 ms prior to contact, which approximates a slice of a flat disc in shape.",savant
+intercept_ball_minus_batter_pos_x_inches,intercept_x_inches,"Distance, in inches, between the intercept point of the bat/ball and the batter's center of mass, in the X (horizontal) direction.",savant
+intercept_ball_minus_batter_pos_y_inches,intercept_y_inches,"Distance, in inches, between the intercept point of the bat/ball and the batter's center of mass, in the Y (mound-to-plate) direction.",savant
+vz0,vz0,"The velocity of the pitch, in feet per second, in z-dimension, determined at y=50 feet.",manual
+estimated_slg_using_speedangle,xslg,Estimated slugging percentage based on launch angle and exit velocity.,manual
+post_fld_score,post_fld_score,Post-pitch field team score,manual
+delta_pitcher_run_exp,delta_pitcher_run_exp,Change in run expectancy from the pitcher's side (the negative of delta_run_exp).,manual
+bat_speed,bat_speed,"Speed of the sweet spot of the bat, in MPH, at the point of contact (or closest approach on a miss). Swings only; 2023+.",manual
+swing_length,swing_length,"Total distance, in feet, travelled by the head of the bat from the start of tracking until contact. Swings only; 2023+.",manual
+miss_distance,miss_distance,"On a swing and miss, how far the bat missed the ball, in inches.",manual

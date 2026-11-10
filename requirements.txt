@@ -1,4 +1,6 @@
 pybaseball==2.2.7
+requests==2.34.2
+beautifulsoup4==4.15.0
 pandas==2.3.3
 pyarrow==22.0.0
 duckdb==1.5.6
