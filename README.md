@@ -5,8 +5,8 @@ prediction models. It pulls Statcast pitches, the MLB schedule, venue details an
 dimensions from public sources, then uses dbt to turn them into clean, tested
 DuckDB tables.
 
-**Status:** ingestion and staging are done for 2024–2026 (2.3M pitches, 7,420 games);
-park factors and the modeling layer are in progress.
+**Status:** ingestion, staging and the first mart are done for 2024–2026 (2.3M pitches,
+7,420 games, park data back to 2015). The modeling layer is next.
 
 ## Architecture
 
@@ -15,7 +15,7 @@ flowchart LR
     subgraph Sources
         BS[Baseball Savant<br/>Statcast pitches]
         API[MLB Stats API<br/>schedule, venues]
-        PD[Baseball Savant<br/>park dimensions]
+        PD[Baseball Savant<br/>park dimensions, factors,<br/>environment]
     end
     subgraph "Raw (files, untouched)"
         R1[Parquet<br/>season=YYYY/]
@@ -26,13 +26,15 @@ flowchart LR
         S1[stg_savant__pitches]
         S2[stg_mlb__games]
         S3[stg_mlb__venues]
-        S4[stg_savant__park_dimensions]
+        S4[stg_savant__park_*<br/>dimensions, factors,<br/>environment]
+        M1[(dim_venue_seasons)]
     end
     BS -->|ingest.py| R1 --> S1
     API -->|ingest_schedule.py<br/>ingest_venues.py| R2 --> S2 & S3
-    PD -->|ingest_park_dimensions.py| R3 --> S4
+    PD -->|ingest_park_dimensions.py<br/>ingest_park_factors.py| R3 --> S4
+    S3 & S4 --> M1
     S1 -- game_pk --> S2
-    S2 -- "venue_id, season" --> S3 & S4
+    S2 -- "venue_id, season" --> M1
 ```
 
 - **Raw layer:** each script saves what the source returned, unchanged, partitioned by
@@ -40,7 +42,9 @@ flowchart LR
   are resolved downstream.
 - **Staging layer (dbt):** one model per source table. Renames columns, fixes types,
   removes duplicates and flags which columns are post-pitch outcomes.
-- **Tests:** 40 dbt tests run on every build, including cross-source checks
+- **Marts layer (dbt):** tables built for analysis and models. `dim_venue_seasons` has
+  one row per park per season with everything known about it before the season starts.
+- **Tests:** 58 dbt tests run on every build, including cross-source checks
   ([dbt/README.md](dbt/README.md) lists each one and why it exists).
 
 ## Stack
@@ -64,9 +68,15 @@ Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-
 - **Posted vs measured distances.** The distances painted on the walls don't line up
   across parks (Fenway's 420 sign is listed as "center"), so the models use Savant's
   measured distances and wall heights instead.
-- **Leakage.** Columns describing what happened on a pitch (launch speed, events,
-  win probability) are labeled in staging, and park factors will come from prior
-  seasons only, so a model never trains on information from the future.
+- **Leakage.** Park factors are computed from a season's own home runs, so using the
+  2025 factor for a 2025 pitch would leak the answer. `dim_venue_seasons` only uses the
+  previous season's factors (a 2025 row gets 2022–2024), and a test guards the
+  assumption that rule depends on. Columns describing what happened on a pitch (launch
+  speed, events, win probability) are labeled in staging.
+- **New parks have no history.** The A's in Sacramento and the Rays at Steinbrenner Field
+  have no prior-season park factors, about 7% of 2025 pitches. A warning-level test lists
+  them on every build instead of failing it, and the gap feeds a later lesson on
+  handling missing data in the models.
 - **Tests that are proven to fail.** Each cross-source test was broken on purpose
   (by removing a season's file) to confirm it catches the problem.
 
@@ -83,6 +93,7 @@ python -m venv .venv
 .venv/bin/python scripts/ingest_schedule.py --season 2025
 .venv/bin/python scripts/ingest_venues.py --season 2025
 .venv/bin/python scripts/ingest_park_dimensions.py --season 2025
+.venv/bin/python scripts/ingest_park_factors.py --season 2024 2025   # include the prior season
 
 # Build and test
 cd dbt && ../.venv/bin/dbt build
@@ -103,8 +114,9 @@ data/         raw files and the DuckDB database (git-ignored)
 
 - [x] Statcast, schedule, venue and park dimension ingestion
 - [x] Staging models with tests
-- [ ] Park factors and park environment (Savant), prior-season only
-- [ ] `dim_venue_seasons` mart and an incremental pitch fact table
+- [x] Park factors and park environment (Savant), prior-season only
+- [x] `dim_venue_seasons` mart
+- [ ] Incremental pitch fact table
 - [ ] Scheduled daily runs
 - [ ] Home run prediction models
 

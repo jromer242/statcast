@@ -27,3 +27,6 @@ models:
       # Table, not view: a view would store the relative Parquet path and break when
       # queried from anywhere but dbt/ (e.g. notebooks). It also dedupes once, at build.
       +materialized: table
+    marts:
+      # Marts are the tables analyses and models read from.
+      +materialized: table

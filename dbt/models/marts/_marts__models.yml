@@ -1,0 +1,44 @@
+models:
+  - name: dim_venue_seasons
+    description: >
+      One row per venue per season with everything known about the park before that
+      season starts: location, orientation, roof and turf (Stats API), measured
+      dimensions and wall heights (Savant, same season), and park factors and fly ball
+      carry from the previous season (Savant). Join pitches through stg_mlb__games on
+      (venue_id, season).
+
+
+      Leakage rule: park factors and environment come from season - 1, because they're
+      computed from a season's own batted balls. When `walls_changed` is true, those
+      prior factors describe the old walls.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "venue_id || '-' || season"
+    columns:
+      - name: venue_id
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: venue_name
+        data_tests: [not_null]
+      - name: has_measured_dimensions
+        description: False for one-off neutral sites, which Savant doesn't measure.
+      - name: walls_changed
+        description: The walls moved or changed height since last season, so prior-season park factors describe the old park.
+      - name: park_factor_season
+        description: The season the park factor and environment columns come from. Always season - 1.
+      - name: has_prior_park_factors
+        description: >
+          False when the park had no qualifying sample last season: neutral sites, or a
+          team's first season in a park (Sacramento and Steinbrenner Field in 2025).
+      - name: prior_pf_hr_3yr
+        description: Home run index (100 = average) over the three seasons before this one, all batters.
+      - name: prior_pf_hr_3yr_lhb
+        description: Same, left-handed batters only.
+      - name: prior_pf_hr_3yr_rhb
+        description: Same, right-handed batters only.
+      - name: prior_pf_hr_1yr
+        description: Home run index from last season alone. Noisier than 3-year, but reacts faster to changes.
+      - name: prior_extra_distance_ft
+        description: Extra feet a fly ball carried here last season versus an average park.

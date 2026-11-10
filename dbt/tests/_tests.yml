@@ -33,3 +33,8 @@ data_tests:
       `rolling_years` seasons. dim_venue_seasons' leakage rule (use season - 1) depends
       on this; if Savant changed how it labels windows, the mart would use future data.
 
+  - name: assert_home_parks_have_prior_park_factors
+    description: >
+      Warning only. Lists real home parks (20+ games) with no 3-year park factor from the
+      previous season. Expected for a team's first seasons in a new park; anything else
+      means ingest_park_factors.py wasn't run for the previous season.
