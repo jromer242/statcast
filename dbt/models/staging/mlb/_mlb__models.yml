@@ -1,0 +1,46 @@
+models:
+  - name: stg_mlb__games
+    description: >
+      One row per MLB game (regular season + postseason) from the Stats API schedule.
+      Joins to Statcast on game_pk and gives each game its venue_id. Duplicate game_pks
+      (postponed and suspended games) are resolved by keeping the latest scheduled start.
+    columns:
+      - name: game_pk
+        description: Game ID. Same value as Statcast's game_pk.
+        data_tests:
+          - unique
+          - not_null
+      - name: venue_id
+        description: MLB venue ID. Join key for venue dimensions and Savant park factors.
+        data_tests:
+          - not_null
+      - name: home_team_id
+        data_tests:
+          - not_null
+      - name: away_team_id
+        data_tests:
+          - not_null
+      - name: official_date
+        description: The game's date as MLB records it. Matches Statcast game_date, including for suspended games.
+        data_tests:
+          - not_null
+      - name: game_datetime_utc
+        description: Scheduled start time in UTC (the `Z` in the API). Don't derive the game date from it.
+      - name: game_type
+        description: R regular season, F wild card, D division series, L LCS, W World Series.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['R', 'F', 'D', 'L', 'W']
+      - name: status
+        description: Final, Completed Early, Cancelled, Postponed, or a live status (Scheduled, In Progress) during the season.
+      - name: double_header
+        description: N = not a doubleheader, Y = traditional (one ticket, back to back), S = split (separate admissions).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['N', 'Y', 'S']
+      - name: home_score
+        description: Final score. Post-game outcome; never a pre-game feature.
+      - name: away_score
+        description: Final score. Post-game outcome; never a pre-game feature.

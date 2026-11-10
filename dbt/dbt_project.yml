@@ -12,6 +12,8 @@ clean-targets: ["target", "dbt_packages"]
 vars:
   # Raw Parquet written by scripts/ingest.py, relative to this dbt/ folder.
   raw_statcast_glob: "../data/raw/statcast/**/*.parquet"
+  # Raw JSON lines written by scripts/ingest_schedule.py.
+  raw_mlb_schedule_glob: "../data/raw/mlb/schedule/**/*.jsonl"
 
 models:
   statcast:

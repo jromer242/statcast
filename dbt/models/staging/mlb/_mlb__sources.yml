@@ -1,0 +1,20 @@
+sources:
+  - name: mlb
+    description: Raw MLB Stats API pulls (statsapi.mlb.com), written as JSON lines by scripts/ingest_*.py.
+    tables:
+      - name: schedule_raw
+        description: >
+          One line per game object per season file, exactly as the schedule endpoint returned
+          it (regular season + postseason), plus `_ingested_at`. Each run overwrites the
+          season's file. A game_pk can appear more than once in a season: postponed games
+          (original + makeup) and suspended games (start + resumption). Staging deduplicates.
+        config:
+          # sample_size = -1 makes DuckDB scan every line to infer types, so rare fields
+          # (resumeDate, status.reason) are found. Fine at ~2,500 lines per season.
+          external_location: >-
+            read_json('{{ var("raw_mlb_schedule_glob") }}',
+                      format = 'newline_delimited',
+                      hive_partitioning = true,
+                      union_by_name = true,
+                      filename = true,
+                      sample_size = -1)

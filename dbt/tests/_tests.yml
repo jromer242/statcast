@@ -1,0 +1,8 @@
+data_tests:
+  - name: assert_statcast_games_have_one_schedule_row
+    description: >
+      Join coverage between Statcast and the MLB schedule. Fails for any regular-season or
+      postseason game_pk in stg_savant__pitches that has zero or several rows in
+      stg_mlb__games, or whose official_date differs from Statcast's game_date.
+      Usual causes: ingest_schedule.py wasn't run for a season that ingest.py loaded,
+      or the schedule dedupe stopped producing one row per game_pk.
