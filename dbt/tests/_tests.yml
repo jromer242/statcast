@@ -38,3 +38,21 @@ data_tests:
       Warning only. Lists real home parks (20+ games) with no 3-year park factor from the
       previous season. Expected for a team's first seasons in a new park; anything else
       means ingest_park_factors.py wasn't run for the previous season.
+
+  - name: assert_batted_balls_match_pitches
+    description: >
+      Every in-play regular-season or postseason pitch in stg_savant__pitches is in
+      fct_batted_balls, and nothing else is. Guards the incremental build against
+      drift (re-pulled dates older than the lookback window, deleted pitches).
+      Fix with --full-refresh.
+
+  - name: assert_spray_angle_sign_matches_fielders
+    description: >
+      Balls caught by the left fielder average a negative spray angle and by the right
+      fielder a positive one, every season. Guards the sign convention that
+      pull_angle_deg and the wall interpolation depend on.
+
+  - name: assert_over_fence_hrs_reach_the_wall
+    description: >
+      No more than 3% of a season's over-the-fence home runs land short of the
+      interpolated wall (under 1% on 2024-26). Catches a broken wall interpolation.

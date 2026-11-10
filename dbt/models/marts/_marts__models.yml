@@ -42,3 +42,74 @@ models:
         description: Home run index from last season alone. Noisier than 3-year, but reacts faster to changes.
       - name: prior_extra_distance_ft
         description: Extra feet a fly ball carried here last season versus an average park.
+
+  - name: fct_batted_balls
+    description: >
+      One row per batted ball (pitch put in play) in regular-season and postseason
+      games, with its venue and where it went relative to that park's wall. The input
+      table for a batted-ball home run model: replay a hitter's batted balls against
+      every park's walls to estimate park fit.
+
+
+      Built incrementally (rebuilds the last `batted_balls_lookback_days` days each run).
+      Run `dbt build --full-refresh --select fct_batted_balls` after loading park
+      dimensions, re-pulling older pitches, or changing the model.
+
+
+      Contact columns (launch_speed, launch_angle, hit_distance, spray) are outcomes of
+      the pitch. Use them for batted-ball models, never to predict a plate appearance
+      before it happens.
+    columns:
+      - name: pitch_id
+        description: The pitch that was put in play. Primary key.
+        data_tests: [unique, not_null]
+      - name: game_pk
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_mlb__games')
+                field: game_pk
+      - name: venue_id
+        description: Where the game was played (not the home team's usual park).
+        data_tests: [not_null]
+      - name: batter_id
+        data_tests: [not_null]
+      - name: batter_stand
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['L', 'R']
+      - name: batted_ball_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['ground_ball', 'line_drive', 'fly_ball', 'popup']
+      - name: has_launch_data
+        description: False for under 1% of batted balls the tracking system missed. Exclude or impute before modeling.
+      - name: spray_angle_deg
+        description: >
+          Horizontal direction from home plate: 0 is dead center, -45 the left field line,
+          +45 the right field line. Computed from Savant's hit coordinates (hc_x, hc_y).
+      - name: pull_angle_deg
+        description: spray_angle_deg with the sign flipped for right-handed batters, so positive always means the pull side.
+      - name: spray_direction
+        description: pull, center or oppo, split at +-15 degrees of pull_angle_deg.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['pull', 'center', 'oppo']
+      - name: wall_distance_at_spray_ft
+        description: >
+          Distance to the wall at the ball's spray angle, linearly interpolated between
+          Savant's measured line, gap and center distances. Gap angle is the
+          fence_gap_angle_deg var. Null at neutral sites without measured dimensions.
+      - name: wall_height_at_spray_ft
+        description: Wall height at the ball's spray angle, interpolated the same way.
+      - name: distance_past_wall_ft
+        description: hit_distance minus wall_distance_at_spray_ft. Positive means the ball would have landed beyond the wall.
+      - name: is_home_run
+        description: Any home run, including inside-the-park.
+        data_tests: [not_null]
+      - name: is_over_fence_hr
+        description: Home runs that cleared the wall. The label for park-fit models, since inside-the-park home runs don't depend on the walls.

@@ -5,8 +5,8 @@ prediction models. It pulls Statcast pitches, the MLB schedule, venue details an
 dimensions from public sources, then uses dbt to turn them into clean, tested
 DuckDB tables.
 
-**Status:** ingestion, staging and the first mart are done for 2024–2026 (2.3M pitches,
-7,420 games, park data back to 2015). The modeling layer is next.
+**Status:** ingestion, staging and the marts are done for 2024–2026 (2.3M pitches,
+380k batted balls, 7,420 games, park data back to 2015). The modeling layer is next.
 
 ## Architecture
 
@@ -28,6 +28,7 @@ flowchart LR
         S3[stg_mlb__venues]
         S4[stg_savant__park_*<br/>dimensions, factors,<br/>environment]
         M1[(dim_venue_seasons)]
+        M2[(fct_batted_balls)]
     end
     BS -->|ingest.py| R1 --> S1
     API -->|ingest_schedule.py<br/>ingest_venues.py| R2 --> S2 & S3
@@ -35,6 +36,7 @@ flowchart LR
     S3 & S4 --> M1
     S1 -- game_pk --> S2
     S2 -- "venue_id, season" --> M1
+    S1 & S2 & M1 --> M2
 ```
 
 - **Raw layer:** each script saves what the source returned, unchanged, partitioned by
@@ -44,7 +46,10 @@ flowchart LR
   removes duplicates and flags which columns are post-pitch outcomes.
 - **Marts layer (dbt):** tables built for analysis and models. `dim_venue_seasons` has
   one row per park per season with everything known about it before the season starts.
-- **Tests:** 58 dbt tests run on every build, including cross-source checks
+  `fct_batted_balls` has one row per ball in play, with its spray angle and the
+  distance and height of that park's wall in the direction it went. It is built
+  incrementally.
+- **Tests:** 71 dbt tests run on every build, including cross-source checks
   ([dbt/README.md](dbt/README.md) lists each one and why it exists).
 
 ## Stack
@@ -77,6 +82,16 @@ Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-
   have no prior-season park factors, about 7% of 2025 pitches. A warning-level test lists
   them on every build instead of failing it, and the gap feeds a later lesson on
   handling missing data in the models.
+- **Where's the wall?** Savant measures each wall at five points (both lines, both
+  gaps, center) but doesn't say at what angle the gaps are. `fct_batted_balls`
+  interpolates the wall along the ball's spray angle, and the gap angle (20°) was chosen
+  by how well "distance past the wall" separates home runs from other fly balls and
+  line drives. It works: that AUC is 0.997, versus 0.973 for raw distance. A test
+  checks that real home runs land beyond the computed wall.
+- **Incremental tables drift.** Each run of `fct_batted_balls` only rebuilds the last
+  week, so a re-pulled older date would silently go stale. A test compares it pitch
+  by pitch with staging, and it was proven by deleting a day: the incremental run
+  didn't restore it, and the test flagged 756 rows.
 - **Tests that are proven to fail.** Each cross-source test was broken on purpose
   (by removing a season's file) to confirm it catches the problem.
 
@@ -116,7 +131,7 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] Staging models with tests
 - [x] Park factors and park environment (Savant), prior-season only
 - [x] `dim_venue_seasons` mart
-- [ ] Incremental pitch fact table
+- [x] Incremental batted-ball fact table (`fct_batted_balls`)
 - [ ] Scheduled daily runs
 - [ ] Home run prediction models
 

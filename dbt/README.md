@@ -17,12 +17,16 @@ Two layers of models:
   removes duplicates. No business logic.
 - **Marts** (`models/marts/`): tables built for analysis and modeling, combining sources.
   `dim_venue_seasons` is one row per park per season with everything known about it
-  *before* the season starts.
+  *before* the season starts. `fct_batted_balls` is one row per ball in play, with its
+  spray angle and the park's wall in that direction.
 
 How they join:
 
 ```
 stg_savant__pitches --game_pk--> stg_mlb__games --(venue_id, season)--> dim_venue_seasons
+          \_____________________________________________________________________/
+                                         |
+                                  fct_batted_balls
 ```
 
 `dim_venue_seasons` is built from:
@@ -71,6 +75,15 @@ Run from this `dbt/` folder with the project venv:
 ../.venv/bin/dbt build --select stg_mlb__games+  # one model, plus everything downstream of it
 ../.venv/bin/dbt test                           # tests only, against tables already built
 ../.venv/bin/dbt docs generate && ../.venv/bin/dbt docs serve   # browsable docs and lineage
+```
+
+`fct_batted_balls` is **incremental**: a normal build only rebuilds the last
+`batted_balls_lookback_days` (7) days before the newest game it already has. Rebuild it
+from scratch after loading park dimensions, re-pulling older Statcast dates, or changing
+the model:
+
+```bash
+../.venv/bin/dbt build --full-refresh --select fct_batted_balls
 ```
 
 `dbt build` runs each model's tests right after building it, and skips downstream models if a
@@ -146,6 +159,15 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 |---|---|
 | `venue_id || '-' || season` unique; `venue_id`, `season`, `venue_name` not null | Pitches join here through games. A duplicate would double count pitches. |
 
+### `fct_batted_balls` (mart: one row per ball in play)
+
+| Test | Why it matters |
+|---|---|
+| `pitch_id` unique, not null | The table's key. A duplicate means the incremental delete+insert broke. |
+| `game_pk` not null, and present in `stg_mlb__games` | Every batted ball needs a game to get its park. |
+| `venue_id`, `batter_id`, `is_home_run` not null | Join keys and the label. |
+| `batter_stand` in L, R; `batted_ball_type` in ground_ball, line_drive, fly_ball, popup; `spray_direction` in pull, center, oppo | Catches encoding changes before they split a feature. |
+
 ### `savant_field_dictionary` (seed)
 
 | Test | Why it matters |
@@ -163,6 +185,9 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 | `assert_park_factor_window_ends_in_season` | Every Savant window ends in its labeled season and spans `rolling_years` seasons. The leakage rule (use season - 1) is only safe if this holds; if Savant changed its labels, the mart would quietly use future data. |
 | `assert_home_parks_have_prior_park_factors` | **Warning only.** Lists home parks (20+ games) with no 3-year park factor from the previous season. Expected for a team's first seasons in a park (A's in Sacramento 2025–26, Rays at Steinbrenner Field 2025 and back at Tropicana Field 2026); anything else means a season of park factors wasn't loaded. |
 | `assert_home_parks_have_dimensions` | Every venue with 20+ completed games in a season (a real home park) has Savant measured dimensions that season. One-off neutral sites (Tokyo, London, Mexico City, Seoul, Williamsport) are expected to be missing: about 0.1–0.3% of pitches per season. Verified to fail (30 parks) with the 2026 file removed. |
+| `assert_batted_balls_match_pitches` | **Incremental drift.** Every in-play regular-season or postseason pitch in staging is in `fct_batted_balls` exactly once, and nothing else is. Verified to fail (756 rows) by deleting one day from 2024: the incremental run didn't restore it, because that day is outside the lookback window. Fix with `--full-refresh`. |
+| `assert_spray_angle_sign_matches_fielders` | Balls caught by the left fielder average a negative spray angle and by the right fielder a positive one, every season. `pull_angle_deg` and the wall interpolation depend on this sign convention. Verified to fail (6 rows) with the sign flipped. |
+| `assert_over_fence_hrs_reach_the_wall` | No more than 3% of a season's over-the-fence home runs land short of the interpolated wall (under 1% on 2024–26). Catches a broken interpolation. Verified to fail with left and right swapped, though only for 2 of 3 seasons, since swapping sides only matters in lopsided parks. The spray test above is the stronger guard for that. |
 
 ## Adding a test
 
