@@ -56,3 +56,9 @@ data_tests:
     description: >
       No more than 3% of a season's over-the-fence home runs land short of the
       interpolated wall (under 1% on 2024-26). Catches a broken wall interpolation.
+
+  - name: assert_wall_needs_spray_angle
+    description: >
+      Wall distance and height are null whenever spray_angle_deg is null. Guards against
+      NULL-skipping functions like DuckDB's least(), which once gave balls without hit
+      coordinates the right field line's distance.

@@ -68,15 +68,20 @@ spray as (
 
 -- Wall distance and height at the ball's spray angle, linearly interpolated between
 -- Savant's five measured points: lines (+-45), gaps (+-gap) and center (0).
--- Savant doesn't publish the gap angle. {{ gap }} degrees separated home runs from
--- other fly balls and line drives best (2024-26, AUC of distance past the wall: 0.9968
--- at 20, 0.9965 at 22.5, 0.9942 at 30). Balls hooking past a line use the line's value.
+-- Savant doesn't publish the gap angle. Choose it by how well distance past the wall
+-- separates home runs from other fly balls and line drives (2024-26 AUC: 0.99699 at
+-- 17.5, 0.99690 at 20, 0.99659 at 22.5, 0.99435 at 30; raw distance 0.9720). 17.5-22.5
+-- are nearly tied; notebooks/06_wall_distance_auc.ipynb re-checks it with a
+-- train/test split. Balls hooking past a line use the line's value.
 walls as (
 
     select
         s.*,
         g.venue_id,
-        least(abs(s.spray_angle_deg), 45)               as abs_angle,
+        -- DuckDB's least() skips NULLs (least(NULL, 45) = 45), so guard it: no hit
+        -- coordinates means no spray angle and no wall.
+        case when s.spray_angle_deg is not null
+             then least(abs(s.spray_angle_deg), 45) end  as abs_angle,
         case when s.spray_angle_deg < 0 then v.distance_lf_gap_ft  else v.distance_rf_gap_ft  end as gap_distance,
         case when s.spray_angle_deg < 0 then v.distance_lf_line_ft else v.distance_rf_line_ft end as line_distance,
         case when s.spray_angle_deg < 0 then v.height_lf_gap_ft    else v.height_rf_gap_ft    end as gap_height,

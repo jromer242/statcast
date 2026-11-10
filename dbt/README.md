@@ -188,6 +188,7 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 | `assert_batted_balls_match_pitches` | **Incremental drift.** Every in-play regular-season or postseason pitch in staging is in `fct_batted_balls` exactly once, and nothing else is. Verified to fail (756 rows) by deleting one day from 2024: the incremental run didn't restore it, because that day is outside the lookback window. Fix with `--full-refresh`. |
 | `assert_spray_angle_sign_matches_fielders` | Balls caught by the left fielder average a negative spray angle and by the right fielder a positive one, every season. `pull_angle_deg` and the wall interpolation depend on this sign convention. Verified to fail (6 rows) with the sign flipped. |
 | `assert_over_fence_hrs_reach_the_wall` | No more than 3% of a season's over-the-fence home runs land short of the interpolated wall (under 1% on 2024–26). Catches a broken interpolation. Verified to fail with left and right swapped, though only for 2 of 3 seasons, since swapping sides only matters in lopsided parks. The spray test above is the stronger guard for that. |
+| `assert_wall_needs_spray_angle` | Wall distance and height are null whenever the spray angle is null. Written after a real bug: DuckDB's `least(NULL, 45)` returns 45, so 154 balls without hit coordinates were given the right field line's distance. Notebook 06's reconciliation check found it. Verified to fail (154 rows) on the unfixed model. |
 
 ## Adding a test
 

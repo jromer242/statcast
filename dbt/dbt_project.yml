@@ -24,7 +24,7 @@ vars:
   # fct_batted_balls: days before the newest loaded game to rebuild on each incremental run.
   batted_balls_lookback_days: 7
   # fct_batted_balls: spray angle of the gap measurements (Savant doesn't publish it).
-  # 20 separated home runs from other fly balls best on 2024-26; see the model.
+  # 17.5-22.5 separate home runs about equally well on 2024-26; see notebook 06.
   fence_gap_angle_deg: 20
 
 models:

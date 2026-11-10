@@ -49,7 +49,7 @@ flowchart LR
   `fct_batted_balls` has one row per ball in play, with its spray angle and the
   distance and height of that park's wall in the direction it went. It is built
   incrementally.
-- **Tests:** 71 dbt tests run on every build, including cross-source checks
+- **Tests:** 72 dbt tests run on every build, including cross-source checks
   ([dbt/README.md](dbt/README.md) lists each one and why it exists).
 
 ## Stack
@@ -86,7 +86,9 @@ Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-
   gaps, center) but doesn't say at what angle the gaps are. `fct_batted_balls`
   interpolates the wall along the ball's spray angle, and the gap angle (20°) was chosen
   by how well "distance past the wall" separates home runs from other fly balls and
-  line drives. It works: that AUC is 0.997, versus 0.973 for raw distance. A test
+  line drives. It works: that AUC is 0.997, versus 0.972 for raw distance. Angles from
+  17.5° to 22.5° are nearly tied; [notebook 06](notebooks/06_wall_distance_auc.ipynb)
+  walks through the AUC and re-checks the choice with a train/test split by season. A test
   checks that real home runs land beyond the computed wall.
 - **Incremental tables drift.** Each run of `fct_batted_balls` only rebuilds the last
   week, so a re-pulled older date would silently go stale. A test compares it pitch
