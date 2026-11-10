@@ -44,3 +44,39 @@ models:
         description: Final score. Post-game outcome; never a pre-game feature.
       - name: away_score
         description: Final score. Post-game outcome; never a pre-game feature.
+
+  - name: stg_mlb__venues
+    description: >
+      One row per venue per season from the Stats API venues endpoint: location, elevation,
+      orientation, roof, turf, capacity and posted dimensions. Venues change between seasons
+      (walls moved, capacity, names), so join on (venue_id, season), never venue_id alone.
+      Neutral sites (London, Tokyo, Williamsport...) usually lack elevation and azimuth.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "venue_id || '-' || season"
+    columns:
+      - name: venue_id
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: venue_name
+        data_tests: [not_null]
+      - name: elevation_ft
+        description: Feet above sea level. Null for most one-off neutral sites.
+      - name: azimuth_deg
+        description: >
+          Compass direction from home plate toward center field (0 = north, 90 = east).
+          Combine with wind direction to get wind blowing out vs in. Null for most neutral sites.
+      - name: roof_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Open', 'Retractable', 'Dome']
+      - name: turf_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Grass', 'Artificial Turf']
+      - name: posted_center_ft
+        description: Posted (wall sign) distance, not measured. Neutral sites often show round placeholder values like 400.

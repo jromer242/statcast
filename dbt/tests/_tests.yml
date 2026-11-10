@@ -14,3 +14,9 @@ data_tests:
       game_pk, so pitches from the first part would get the wrong park. Runs on the raw
       schedule; ignores Postponed and Cancelled rows. If it fails, venues have to be
       assigned per part of the game instead of per game_pk.
+
+  - name: assert_every_game_has_venue_season
+    description: >
+      Every game in stg_mlb__games has a stg_mlb__venues row for its venue_id and season.
+      Fails when ingest_venues.py wasn't run for a season that ingest_schedule.py loaded.
+

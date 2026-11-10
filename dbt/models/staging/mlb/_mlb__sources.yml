@@ -18,3 +18,18 @@ sources:
                       union_by_name = true,
                       filename = true,
                       sample_size = -1)
+
+      - name: venues_raw
+        description: >
+          One line per venue per season, exactly as the venues endpoint returned it
+          (hydrate=fieldInfo,location,timezone), plus `_ingested_at`. Covers every venue
+          in that season's schedule, neutral sites included. Each run overwrites the
+          season's file, so (id, season) is unique.
+        config:
+          external_location: >-
+            read_json('{{ var("raw_mlb_venues_glob") }}',
+                      format = 'newline_delimited',
+                      hive_partitioning = true,
+                      union_by_name = true,
+                      filename = true,
+                      sample_size = -1)

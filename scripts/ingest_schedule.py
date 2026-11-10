@@ -15,17 +15,15 @@ finished seasons only need loading once.
 
 import argparse
 import datetime as dt
-import json
 import logging
 import sys
 import time
-from pathlib import Path
 
 import requests
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from common import PROJECT_ROOT, USER_AGENT, setup_logging, write_jsonl
+
 RAW_DIR = PROJECT_ROOT / "data" / "raw" / "mlb" / "schedule"
-LOG_DIR = PROJECT_ROOT / "logs"
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 # R = regular season; F, D, L, W = wild card, division series, LCS, World Series.
@@ -33,21 +31,6 @@ BASE_URL = "https://statsapi.mlb.com/api/v1"
 GAME_TYPES = "R,F,D,L,W"
 
 log = logging.getLogger("ingest_schedule")
-
-
-def setup_logging(verbose: bool) -> None:
-    LOG_DIR.mkdir(exist_ok=True)
-    fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
-
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(fmt)
-    logfile = logging.FileHandler(LOG_DIR / "ingest_schedule.log")
-    logfile.setFormatter(fmt)
-
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG if verbose else logging.INFO)
-    root.addHandler(console)
-    root.addHandler(logfile)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -72,31 +55,18 @@ def fetch_season(session: requests.Session, season: int) -> list[dict]:
     return games
 
 
-def write_raw(games: list[dict], season: int) -> Path:
-    ingested_at = dt.datetime.now(dt.timezone.utc).isoformat()
-    out_dir = RAW_DIR / f"season={season}"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / "schedule.jsonl"
-
-    # Write to a temp file, then rename: a crash mid-write never leaves a half-written
-    # file where dbt would read it. The rename replaces the old file in one step.
-    tmp = path.with_suffix(".jsonl.tmp")
-    with tmp.open("w") as f:
-        for g in games:
-            f.write(json.dumps({**g, "_ingested_at": ingested_at}) + "\n")
-    tmp.replace(path)
-
+def write_raw(games: list[dict], season: int) -> None:
+    path = write_jsonl(games, RAW_DIR / f"season={season}" / "schedule.jsonl")
     log.info("Wrote %s games to %s", f"{len(games):,}", path.relative_to(PROJECT_ROOT))
-    return path
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    setup_logging(args.verbose)
+    setup_logging("ingest_schedule", args.verbose)
     log.info("Run started: seasons %s", args.season)
 
     with requests.Session() as session:
-        session.headers["User-Agent"] = "statcast-learning-project"
+        session.headers["User-Agent"] = USER_AGENT
         for i, season in enumerate(args.season):
             if i:
                 time.sleep(1)  # be polite between requests
