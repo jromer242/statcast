@@ -6,6 +6,7 @@ Turns raw files from `scripts/` into clean, tested tables in `data/statcast.duck
 scripts/ingest.py                  -> data/raw/statcast/season=YYYY/*.parquet            -> stg_savant__pitches
 scripts/ingest_schedule.py         -> data/raw/mlb/schedule/season=YYYY/*.jsonl          -> stg_mlb__games
 scripts/ingest_venues.py           -> data/raw/mlb/venues/season=YYYY/*.jsonl            -> stg_mlb__venues
+scripts/ingest_players.py          -> data/raw/mlb/players/season=YYYY/*.jsonl           -> stg_mlb__players
 scripts/ingest_park_dimensions.py  -> data/raw/savant/park_dimensions/season=YYYY/*.jsonl -> stg_savant__park_dimensions
 scripts/ingest_park_factors.py     -> data/raw/savant/park_factors/season=YYYY/*.jsonl    -> stg_savant__park_factors
                                    -> data/raw/savant/park_environment/season=YYYY/*.jsonl -> stg_savant__park_environment
@@ -18,7 +19,8 @@ Two layers of models:
 - **Marts** (`models/marts/`): tables built for analysis and modeling, combining sources.
   `dim_venue_seasons` is one row per park per season with everything known about it
   *before* the season starts. `fct_batted_balls` is one row per ball in play, with its
-  spray angle and the park's wall in that direction.
+  spray angle and the park's wall in that direction. `fct_plate_appearances` is one row per
+  plate appearance, and `dim_players` one row per player.
 
 How they join:
 
@@ -27,7 +29,17 @@ stg_savant__pitches --game_pk--> stg_mlb__games --(venue_id, season)--> dim_venu
           \_____________________________________________________________________/
                                          |
                                   fct_batted_balls
+                                         ^
+                                         | batted_ball_pitch_id = pitch_id
+dim_players <--batter_id, pitcher_id-- fct_plate_appearances --(venue_id, season)--> dim_venue_seasons
 ```
+
+`fct_plate_appearances` rolls pitches up to one row per Savant at-bat. The situation
+(inning, outs, runners, score) comes from the first pitch and the result from the last.
+About 0.2% of at-bats aren't real plate appearances: the inning ended while the batter
+was up (caught stealing, pickoff), and the batter led off the next inning with a fresh count.
+Savant labels those `truncated_pa` or leaves the event empty. They stay in the table
+with `is_completed_pa = false`.
 
 `dim_venue_seasons` is built from:
 
@@ -61,6 +73,7 @@ project root:
 .venv/bin/python scripts/ingest_venues.py --season 2025
 .venv/bin/python scripts/ingest_park_dimensions.py --season 2025   # 2015 or later
 .venv/bin/python scripts/ingest_park_factors.py --season 2024 2025  # 2015 or later; include the prior season
+.venv/bin/python scripts/ingest_players.py --season 2025
 ```
 
 Then `dbt build` from this folder. During the season, re-run the schedule daily (games get
@@ -198,6 +211,30 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 | `venue_id`, `batter_id`, `is_home_run` not null | Join keys and the label. |
 | `batter_stand` in L, R; `batted_ball_type` in ground_ball, line_drive, fly_ball, popup; `spray_direction` in pull, center, oppo | Catches encoding changes before they split a feature. |
 
+### `stg_mlb__players` (one row per player per season)
+
+| Test | Why it matters |
+|---|---|
+| `player_id || '-' || season` unique; `player_id`, `season`, `full_name`, `height_in` not null | One snapshot per player per season; `height_in` not null proves the text parse (`6' 2"`) worked. |
+
+### `dim_players` (mart: one row per player)
+
+| Test | Why it matters |
+|---|---|
+| `player_id` unique, not null; `full_name` not null | The join target for every batter and pitcher. |
+| `bats` in L, R, S; `throws` in L, R, S | `S` for throws looked like a bad value, but it's real: Carlos Cortes and Anthony Seigler are listed as ambidextrous throwers. The test caught them on its first run. |
+
+### `fct_plate_appearances` (mart: one row per plate appearance)
+
+| Test | Why it matters |
+|---|---|
+| `pa_id` unique, not null | The table's key (`game_pk-at_bat_number`). |
+| `game_pk` in `stg_mlb__games`; `venue_id` not null | Every PA gets its park. |
+| `batter_id`, `pitcher_id` in `dim_players` | Every player in Statcast is in the players pull. Catches a season loaded by `ingest.py` but not `ingest_players.py`. |
+| `batted_ball_pitch_id` unique, and in `fct_batted_balls` | The link to launch and wall data holds both ways. |
+| `pa_event` in a fixed list | A new Savant event fails the build instead of quietly counting as an out in `is_at_bat`. |
+| `outs_at_start` in 0, 1, 2; `is_completed_pa`, `is_at_bat` not null | Catches a broken first-pitch rollup. |
+
 ### `savant_field_dictionary` (seed)
 
 | Test | Why it matters |
@@ -219,6 +256,9 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 | `assert_spray_angle_sign_matches_fielders` | Balls caught by the left fielder average a negative spray angle and by the right fielder a positive one, every season. `pull_angle_deg` and the wall interpolation depend on this sign convention. Verified to fail (6 rows) with the sign flipped. |
 | `assert_over_fence_hrs_reach_the_wall` | No more than 3% of a season's over-the-fence home runs land short of the interpolated wall (under 1% on 2024–26). Catches a broken interpolation. Verified to fail with left and right swapped, though only for 2 of 3 seasons, since swapping sides only matters in lopsided parks. The spray test above is the stronger guard for that. |
 | `assert_wall_needs_spray_angle` | Wall distance and height are null whenever the spray angle is null. Written after a real bug: DuckDB's `least(NULL, 45)` returns 45, so 154 balls without hit coordinates were given the right field line's distance. Notebook 06's reconciliation check found it. Verified to fail (154 rows) on the unfixed model. |
+
+| `assert_pa_home_runs_match_batted_balls` | Home runs per season agree between `fct_plate_appearances` and `fct_batted_balls`. Catches the two facts' filters drifting apart, or a stale incremental batted-ball table. On 2024–26 both have 5,551 / 5,763 / 5,643, and 2024's regular season (5,453) matches MLB's official total. |
+| `assert_truncated_pas_end_the_half_inning` | Every at-bat treated as cut short (no event, or `truncated_pa`) is followed by one in the other half-inning. That's the evidence for not counting them as PAs. Holds for all 1,315 on 2024–26. If Savant ever leaves the event off a real PA, this fails instead of PAs quietly disappearing. |
 
 ## Adding a test
 

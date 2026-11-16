@@ -113,3 +113,134 @@ models:
         data_tests: [not_null]
       - name: is_over_fence_hr
         description: Home runs that cleared the wall. The label for park-fit models, since inside-the-park home runs don't depend on the walls.
+
+  - name: dim_players
+    description: >
+      One row per player who appeared in MLB in a loaded season: name, birth date,
+      bats, throws, debut, and their most recent listed position, height and weight.
+      Type 1: the latest season snapshot wins. For values that change between seasons
+      (weight, position), join stg_mlb__players on (player_id, season) instead. Age
+      isn't stored; compute it from birth_date at the game date.
+    columns:
+      - name: player_id
+        description: MLBAM id, the same id Statcast uses for batter_id and pitcher_id.
+        data_tests: [unique, not_null]
+      - name: full_name
+        data_tests: [not_null]
+      - name: bats
+        description: L, R or S (switch hitter). The side for a given PA is fct_plate_appearances.batter_stand.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['L', 'R', 'S']
+      - name: throws
+        description: >
+          L or R, or S for the rare ambidextrous thrower (Carlos Cortes, Anthony Seigler
+          in 2025-26). The arm on a given pitch is fct_plate_appearances.pitcher_throws.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['L', 'R', 'S']
+      - name: primary_position
+        description: Listed position in the latest season (P, C, 1B, ..., DH, TWP for two-way players).
+      - name: first_season_loaded
+        description: First season this player appears in the loaded player data (not their debut; see mlb_debut_date).
+      - name: last_season_loaded
+
+  - name: fct_plate_appearances
+    description: >
+      One row per plate appearance (Savant at-bat) in regular-season and postseason
+      games: the batter, pitcher and park, the situation when it started, and how it
+      ended. The input table for the per-PA home run model and for rate stats
+      (HR/PA, K%, BB%).
+
+
+      About 0.2% of rows aren't real plate appearances: the inning ended while the
+      batter was up (caught stealing, pickoff), and the batter led off the next inning with a
+      fresh count. They have pa_event = 'truncated_pa' and is_completed_pa = false.
+      Filter on is_completed_pa before counting PAs.
+
+
+      Situation columns (`*_at_start`, inning, handedness) are known before the PA.
+      Result columns are outcomes; never use them to predict the same PA.
+    columns:
+      - name: pa_id
+        description: game_pk-at_bat_number. Primary key.
+        data_tests: [unique, not_null]
+      - name: game_pk
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_mlb__games')
+                field: game_pk
+      - name: venue_id
+        description: Where the game was played (not the home team's usual park).
+        data_tests: [not_null]
+      - name: batter_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_players')
+                field: player_id
+      - name: pitcher_id
+        description: Pitcher on the last pitch of the PA.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_players')
+                field: player_id
+      - name: batting_team
+        description: Team abbreviation of the batter's team (away team in the top of the inning).
+      - name: outs_at_start
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2]
+      - name: pitchers_in_pa
+        description: More than 1 when the pitcher was changed during the PA.
+      - name: pa_event
+        description: >
+          How the PA ended (single, strikeout, walk, field_out...), or truncated_pa when
+          the inning ended first. The list is fixed so a new Savant event fails the build
+          instead of quietly counting as an out.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [
+                  'single', 'double', 'triple', 'home_run',
+                  'walk', 'intent_walk', 'hit_by_pitch', 'catcher_interf',
+                  'strikeout', 'strikeout_double_play',
+                  'field_out', 'force_out', 'grounded_into_double_play', 'double_play',
+                  'triple_play', 'fielders_choice', 'fielders_choice_out', 'field_error',
+                  'sac_fly', 'sac_fly_double_play', 'sac_bunt', 'sac_bunt_double_play',
+                  'truncated_pa'
+                ]
+      - name: is_completed_pa
+        description: False when the inning ended during the PA. Counts as a PA in official stats only when true.
+        data_tests: [not_null]
+      - name: is_at_bat
+        description: Official at bat. Excludes walks, HBP, sacrifices, catcher interference and truncated PAs.
+        data_tests: [not_null]
+      - name: batted_ball_pitch_id
+        description: The ball in play that ended the PA, if any. Join to fct_batted_balls for launch and wall data.
+        data_tests:
+          - unique
+          - relationships:
+              arguments:
+                to: ref('fct_batted_balls')
+                field: pitch_id
+      - name: woba_value
+        description: >
+          Savant's wOBA credit for the PA. Savant uses rounded weights (single 0.9, walk
+          0.7, HR 2.0) and credits reaching on an error or fielder's choice like a single,
+          so league wOBA here (~.322 in 2024) runs above FanGraphs' (~.310).
+      - name: woba_denom
+        description: 1 for PAs that count toward wOBA; 0 or null for intentional walks, sac bunts and truncated PAs.
+      - name: run_value
+        description: Change in run expectancy over the PA (sum of delta_run_exp across its pitches).

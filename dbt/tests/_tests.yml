@@ -62,3 +62,15 @@ data_tests:
       Wall distance and height are null whenever spray_angle_deg is null. Guards against
       NULL-skipping functions like DuckDB's least(), which once gave balls without hit
       coordinates the right field line's distance.
+
+  - name: assert_pa_home_runs_match_batted_balls
+    description: >
+      Home runs per season are the same in fct_plate_appearances and fct_batted_balls.
+      Catches the two marts' filters drifting apart, or a stale incremental batted
+      ball table.
+
+  - name: assert_truncated_pas_end_the_half_inning
+    description: >
+      Every encounter treated as a truncated PA (no event, or truncated_pa) is followed
+      by an encounter in a different half-inning, or is the last of the game. Guards
+      the rule that those rows aren't real plate appearances.

@@ -8,7 +8,8 @@ dimensions from public sources, then uses dbt to turn them into clean, tested
 DuckDB tables.
 
 **Status:** ingestion, staging and the marts are done for 2024–2026 (2.3M pitches,
-380k batted balls, 7,420 games, park data back to 2015). The modeling layer is next.
+560k plate appearances, 380k batted balls, 7,420 games, park data back to 2015). The
+modeling layer is next.
 
 ## Architecture
 
@@ -16,7 +17,7 @@ DuckDB tables.
 flowchart LR
     subgraph Sources
         BS[Baseball Savant<br/>Statcast pitches]
-        API[MLB Stats API<br/>schedule, venues]
+        API[MLB Stats API<br/>schedule, venues, players]
         PD[Baseball Savant<br/>park dimensions, factors,<br/>environment]
     end
     subgraph "Raw (files, untouched)"
@@ -28,17 +29,24 @@ flowchart LR
         S1[stg_savant__pitches]
         S2[stg_mlb__games]
         S3[stg_mlb__venues]
+        S5[stg_mlb__players]
         S4[stg_savant__park_*<br/>dimensions, factors,<br/>environment]
         M1[(dim_venue_seasons)]
         M2[(fct_batted_balls)]
+        M3[(fct_plate_appearances)]
+        M4[(dim_players)]
     end
     BS -->|ingest.py| R1 --> S1
-    API -->|ingest_schedule.py<br/>ingest_venues.py| R2 --> S2 & S3
+    API -->|ingest_schedule.py<br/>ingest_venues.py<br/>ingest_players.py| R2 --> S2 & S3 & S5
     PD -->|ingest_park_dimensions.py<br/>ingest_park_factors.py| R3 --> S4
     S3 & S4 --> M1
     S1 -- game_pk --> S2
     S2 -- "venue_id, season" --> M1
     S1 & S2 & M1 --> M2
+    S5 --> M4
+    S1 & S2 --> M3
+    M3 -- batted_ball_pitch_id --> M2
+    M3 -- batter_id, pitcher_id --> M4
 ```
 
 - **Raw layer:** each script saves what the source returned, unchanged, partitioned by
@@ -50,8 +58,10 @@ flowchart LR
   one row per park per season with everything known about it before the season starts.
   `fct_batted_balls` has one row per ball in play, with its spray angle and the
   distance and height of that park's wall in the direction it went. It is built
-  incrementally.
-- **Tests:** 72 dbt tests run on every build, including cross-source checks
+  incrementally. `fct_plate_appearances` has one row per plate appearance (situation at
+  the start, result at the end) and links to its batted ball; `dim_players` has one row
+  per player.
+- **Tests:** 102 dbt tests run on every build, including cross-source checks
   ([dbt/README.md](dbt/README.md) lists each one and why it exists).
 - **CI:** GitHub Actions builds every model and runs every test on each push and pull
   request, using a 4 MB committed sample of the raw data
@@ -99,6 +109,12 @@ Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-
   week, so a re-pulled older date would silently go stale. A test compares it pitch
   by pitch with staging, and it was proven by deleting a day: the incremental run
   didn't restore it, and the test flagged 756 rows.
+- **Not every at-bat is a plate appearance.** When the inning ends on the bases (caught
+  stealing, pickoff), the batter's turn is cut short and they lead off the next inning
+  with a fresh count. Savant gives that cut-short turn its own at-bat, labeled
+  `truncated_pa` or with no event at all (about 1,300 on 2024–26). Counting them would
+  inflate PAs and deflate every rate stat, so `fct_plate_appearances` flags them
+  `is_completed_pa = false`, and a test checks that each one really ended its half-inning.
 - **Tests that are proven to fail.** Each cross-source test was broken on purpose
   (by removing a season's file) to confirm it catches the problem.
 
@@ -116,6 +132,7 @@ python -m venv .venv
 .venv/bin/python scripts/ingest_venues.py --season 2025
 .venv/bin/python scripts/ingest_park_dimensions.py --season 2025
 .venv/bin/python scripts/ingest_park_factors.py --season 2024 2025   # include the prior season
+.venv/bin/python scripts/ingest_players.py --season 2025
 
 # Build and test
 cd dbt && ../.venv/bin/dbt build
@@ -140,6 +157,7 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] Park factors and park environment (Savant), prior-season only
 - [x] `dim_venue_seasons` mart
 - [x] Incremental batted-ball fact table (`fct_batted_balls`)
+- [x] `fct_plate_appearances` and `dim_players`
 - [x] CI: dbt build and test on every push and pull request
 - [ ] Scheduled daily runs
 - [ ] Home run prediction models
