@@ -1,6 +1,7 @@
 # statcast
 
 [![dbt CI](https://github.com/jromer242/statcast/actions/workflows/dbt-ci.yml/badge.svg)](https://github.com/jromer242/statcast/actions/workflows/dbt-ci.yml)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://statcast-mgqkahnvzbyd2kqdvcsvpx.streamlit.app)
 
 A local data pipeline for MLB pitch-level data, built as the foundation for home run
 prediction models. It pulls Statcast pitches, the MLB schedule, venue details and park
@@ -13,10 +14,13 @@ modeling layer is next.
 
 ## The app
 
+**Live: [statcast-mgqkahnvzbyd2kqdvcsvpx.streamlit.app](https://statcast-mgqkahnvzbyd2kqdvcsvpx.streamlit.app)**
+
 A Streamlit app ([app/](app/)) puts any hitter's fly balls and line drives on any park's
 walls ("would this have been a home run at Fenway?") and ranks hitters by season. It
 reads three small extracts that dbt builds for it (about 3 MB of Parquet in `app/data/`),
-so it runs anywhere without the 1.2 GB database. Run it locally:
+so it runs anywhere without the 1.2 GB database. It's deployed on Streamlit Community
+Cloud from `main`, so a push that changes `app/` redeploys it. Run it locally:
 
 ```bash
 .venv/bin/streamlit run app/streamlit_app.py
@@ -180,7 +184,7 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] `dim_games`, and enforced contracts on every mart
 - [x] CI: dbt build and test on every push and pull request
 - [x] Streamlit app: spray charts on any park's walls, and leaderboards
-- [ ] Deploy the app on Streamlit Community Cloud
+- [x] Deploy the app on Streamlit Community Cloud
 - [ ] Scheduled daily runs
 - [ ] Home run prediction models
 
