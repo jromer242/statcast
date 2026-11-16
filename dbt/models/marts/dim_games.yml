@@ -1,0 +1,127 @@
+models:
+  - name: dim_games
+    description: >
+      One row per regular-season or postseason game: when it started (UTC and local),
+      where, who played, what kind of game, and how it went. Built on stg_mlb__games,
+      so a postponed or suspended game is one row (the makeup or the resumption).
+      Includes cancelled games; filter on is_completed or has_pitch_data.
+    config:
+      contract:
+        enforced: true
+    columns:
+      # keys
+      - name: game_pk
+        data_type: bigint
+        description: MLB game id. Primary key; Statcast pitches join on it.
+        constraints: [{type: primary_key}]
+      - name: venue_id
+        data_type: bigint
+        description: Where the game was played (not the home team's usual park). Join dim_venue_seasons on (venue_id, season).
+        constraints: [{type: not_null}]
+      - name: home_team_id
+        data_type: bigint
+        constraints: [{type: not_null}]
+      - name: away_team_id
+        data_type: bigint
+        constraints: [{type: not_null}]
+
+      # when
+      - name: official_date
+        data_type: date
+        description: The game's date as MLB records it. Matches Statcast's game_date.
+        constraints: [{type: not_null}]
+      - name: season
+        data_type: integer
+        constraints: [{type: not_null}]
+      - name: game_datetime_utc
+        data_type: timestamp
+        description: Scheduled start in UTC (no time zone stored). Night games in the Americas fall on the next UTC day.
+      - name: game_datetime_local
+        data_type: timestamp
+        description: Scheduled start in the park's local time, from the venue's time zone.
+      - name: local_start_hour
+        data_type: bigint
+        description: Hour of the local start (0-23). Day games start 11-17, night games 16-20.
+      - name: day_night
+        data_type: varchar
+        description: day or night, as MLB classifies the game.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['day', 'night']
+
+      # what kind of game
+      - name: game_type
+        data_type: varchar
+        description: R regular season, F wild card, D division series, L LCS, W World Series.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['R', 'F', 'D', 'L', 'W']
+      - name: is_postseason
+        data_type: boolean
+      - name: series_description
+        data_type: varchar
+      - name: double_header
+        data_type: varchar
+        description: N = not a doubleheader, Y = traditional (one ticket, back to back), S = split (separate admissions).
+      - name: game_number
+        data_type: bigint
+        description: 1 or 2 within a doubleheader; 1 otherwise.
+      - name: scheduled_innings
+        data_type: bigint
+        description: 9, or 7 for some doubleheaders.
+
+      # where and who
+      - name: venue_name
+        data_type: varchar
+      - name: is_neutral_site
+        data_type: boolean
+        description: >
+          The venue hosted fewer than 20 completed games that season, so it isn't a
+          team's home park: Tokyo, London, Seoul, Mexico City, Williamsport, Rickwood,
+          Bristol, Field of Dreams, Las Vegas. Same threshold as the
+          assert_home_parks_* tests.
+        constraints: [{type: not_null}]
+      - name: home_team_name
+        data_type: varchar
+      - name: away_team_name
+        data_type: varchar
+      - name: home_team_abbrev
+        data_type: varchar
+        description: Statcast's abbreviation (NYY, LAD...), the value fct_plate_appearances uses for batting_team. Null when the game has no pitch data.
+      - name: away_team_abbrev
+        data_type: varchar
+
+      # status
+      - name: status
+        data_type: varchar
+        description: Final, Completed Early, Cancelled, or a live status (Scheduled, In Progress) during the season.
+      - name: is_completed
+        data_type: boolean
+        description: Final or Completed Early (a shortened game that counts).
+        constraints: [{type: not_null}]
+      - name: status_reason
+        data_type: varchar
+        description: Why a game was postponed, cancelled or ended early (Rain, Inclement Weather...).
+      - name: was_suspended
+        data_type: boolean
+        description: The game was suspended and finished on a later date. Its pitches span two dates.
+      - name: was_rescheduled
+        data_type: boolean
+        description: The game was moved from its original date.
+      - name: has_pitch_data
+        data_type: boolean
+        description: Statcast has pitches for this game. False for cancelled games.
+        constraints: [{type: not_null}]
+      - name: pitches
+        data_type: bigint
+        description: Statcast pitches in the game (0 when none).
+
+      # outcome
+      - name: home_score
+        data_type: bigint
+        description: Final score. Post-game outcome; never a pre-game feature.
+      - name: away_score
+        data_type: bigint
+        description: Final score. Post-game outcome; never a pre-game feature.
