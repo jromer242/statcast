@@ -10,3 +10,7 @@ dbt-duckdb==1.11.1
 sqlalchemy==2.0.45
 duckdb-engine==0.17.0
 streamlit==1.67.0
+matplotlib==3.11.2
+scikit-learn==1.9.1
+# On macOS, xgboost needs the OpenMP runtime: brew install libomp
+xgboost==3.4.1

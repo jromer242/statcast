@@ -26,6 +26,17 @@ Cloud from `main`, so a push that changes `app/` redeploys it. Run it locally:
 .venv/bin/streamlit run app/streamlit_app.py
 ```
 
+## Modeling
+
+[Notebook 07](notebooks/07_park_fit_model.ipynb) trains a **batted-ball home run model**:
+for one fly ball or line drive, the chance it clears the wall in a given park, from exit
+velocity, launch angle, direction, the wall in that direction and the park's carry. It
+climbs a ladder from logistic regression to XGBoost, trained on 2024–25 and scored on
+the held-out 2026 season (AUC 0.989 for XGBoost, with calibration checked). Then it
+**replays every 2026 ball into all 30 parks** to find which hitters fit which parks. It's
+written as a guided notebook with ❓ questions, part of how this project is used for
+learning.
+
 ## Architecture
 
 ```mermaid
@@ -88,7 +99,7 @@ flowchart LR
 
 ## Stack
 
-Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-duckdb · Streamlit and Altair · GitHub Actions
+Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-duckdb · Streamlit and Altair · scikit-learn and XGBoost · GitHub Actions
 
 ## Problems worth reading about
 
@@ -139,7 +150,8 @@ Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-
 
 ## Running it
 
-Requires Python 3.10+ (developed on 3.13).
+Requires Python 3.10+ (developed on 3.13). On macOS, XGBoost also needs the OpenMP
+runtime: `brew install libomp`.
 
 ```bash
 python -m venv .venv
@@ -186,7 +198,9 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] Streamlit app: spray charts on any park's walls, and leaderboards
 - [x] Deploy the app on Streamlit Community Cloud
 - [ ] Scheduled daily runs
-- [ ] Home run prediction models
+- [x] Batted-ball park-fit model (notebook 07)
+- [ ] Season home run projections and milestone backtest (notebook 08)
+- [ ] Per-PA home run model (hierarchical Bayesian)
 
 ## Data sources
 
