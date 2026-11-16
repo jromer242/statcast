@@ -19,8 +19,6 @@
     )
 }}
 
-{% set gap = var('fence_gap_angle_deg') %}
-
 with pitches as (
 
     select *
@@ -66,52 +64,26 @@ spray as (
 
 ),
 
--- Wall distance and height at the ball's spray angle, linearly interpolated between
--- Savant's five measured points: lines (+-45), gaps (+-gap) and center (0).
--- Savant doesn't publish the gap angle. Choose it by how well distance past the wall
--- separates home runs from other fly balls and line drives (2024-26 AUC: 0.99699 at
--- 17.5, 0.99690 at 20, 0.99659 at 22.5, 0.99435 at 30; raw distance 0.9720). 17.5-22.5
--- are nearly tied; notebooks/06_wall_distance_auc.ipynb re-checks it with a
--- train/test split. Balls hooking past a line use the line's value.
-walls as (
+-- Wall distance and height at the ball's spray angle, interpolated between Savant's five
+-- measured points by the wall_at_angle macro (macros/wall_at_angle.sql), which
+-- app_park_walls also uses. Savant doesn't publish the gap angle. Choose it by how well
+-- distance past the wall separates home runs from other fly balls and line drives
+-- (2024-26 AUC: 0.99699 at 17.5, 0.99690 at 20, 0.99659 at 22.5, 0.99435 at 30; raw
+-- distance 0.9720). 17.5-22.5 are nearly tied; notebooks/06_wall_distance_auc.ipynb
+-- re-checks it with a train/test split.
+interpolated as (
 
     select
         s.*,
         g.venue_id,
-        -- DuckDB's least() skips NULLs (least(NULL, 45) = 45), so guard it: no hit
-        -- coordinates means no spray angle and no wall.
-        case when s.spray_angle_deg is not null
-             then least(abs(s.spray_angle_deg), 45) end  as abs_angle,
-        case when s.spray_angle_deg < 0 then v.distance_lf_gap_ft  else v.distance_rf_gap_ft  end as gap_distance,
-        case when s.spray_angle_deg < 0 then v.distance_lf_line_ft else v.distance_rf_line_ft end as line_distance,
-        case when s.spray_angle_deg < 0 then v.height_lf_gap_ft    else v.height_rf_gap_ft    end as gap_height,
-        case when s.spray_angle_deg < 0 then v.height_lf_line_ft   else v.height_rf_line_ft   end as line_height,
-        v.distance_cf_ft                                as center_distance,
-        v.height_cf_ft                                  as center_height
+        {{ wall_at_angle('s.spray_angle_deg', 'distance', 'v.') }}  as wall_distance_at_spray_ft,
+        {{ wall_at_angle('s.spray_angle_deg', 'height', 'v.') }}    as wall_height_at_spray_ft
     from spray s
     left join games g
         on g.game_pk = s.game_pk
     left join venues v
         on v.venue_id = g.venue_id
        and v.season = s.season
-
-),
-
-interpolated as (
-
-    select
-        *,
-        case
-            when abs_angle <= {{ gap }}
-                then center_distance + (gap_distance - center_distance) * abs_angle / {{ gap }}
-            else gap_distance + (line_distance - gap_distance) * (abs_angle - {{ gap }}) / (45 - {{ gap }})
-        end                                             as wall_distance_at_spray_ft,
-        case
-            when abs_angle <= {{ gap }}
-                then center_height + (gap_height - center_height) * abs_angle / {{ gap }}
-            else gap_height + (line_height - gap_height) * (abs_angle - {{ gap }}) / (45 - {{ gap }})
-        end                                             as wall_height_at_spray_ft
-    from walls
 
 )
 
