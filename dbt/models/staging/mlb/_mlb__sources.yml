@@ -33,3 +33,19 @@ sources:
                       union_by_name = true,
                       filename = true,
                       sample_size = -1)
+
+      - name: players_raw
+        description: >
+          One line per player who appeared in MLB that season, from the Stats API
+          /sports/1/players endpoint, written by scripts/ingest_players.py. Each run
+          overwrites the season's file, so (id, season) is unique. currentTeam,
+          currentAge and active describe the player on the day of the pull, not that
+          season.
+        config:
+          external_location: >-
+            read_json('{{ var("raw_dir_ci") if target.name == "ci" else var("raw_dir") }}/{{ var("raw_mlb_players_glob") }}',
+                      format = 'newline_delimited',
+                      hive_partitioning = true,
+                      union_by_name = true,
+                      filename = true,
+                      sample_size = -1)

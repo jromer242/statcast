@@ -80,3 +80,27 @@ models:
                 values: ['Grass', 'Artificial Turf']
       - name: posted_center_ft
         description: Posted (wall sign) distance, not measured. Neutral sites often show round placeholder values like 400.
+
+  - name: stg_mlb__players
+    description: >
+      One row per player per season from the Stats API players endpoint: name, birth
+      date, bats, throws, and that season's listed position, height and weight. Join
+      on (player_id, season) for season-specific values, or use dim_players for one row
+      per player.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "player_id || '-' || season"
+    columns:
+      - name: player_id
+        description: MLBAM id, the same id Statcast uses for batter_id and pitcher_id.
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: full_name
+        data_tests: [not_null]
+      - name: bats
+        description: L, R or S (switch).
+      - name: height_in
+        description: Listed height in inches, parsed from text like 6' 2".
+        data_tests: [not_null]

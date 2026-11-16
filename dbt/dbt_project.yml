@@ -23,6 +23,8 @@ vars:
   raw_mlb_schedule_glob: "mlb/schedule/**/*.jsonl"
   # Raw JSON lines written by scripts/ingest_venues.py and scripts/ingest_park_dimensions.py.
   raw_mlb_venues_glob: "mlb/venues/**/*.jsonl"
+  # Raw JSON lines written by scripts/ingest_players.py.
+  raw_mlb_players_glob: "mlb/players/**/*.jsonl"
   raw_savant_park_dimensions_glob: "savant/park_dimensions/**/*.jsonl"
   # Raw JSON lines written by scripts/ingest_park_factors.py.
   raw_savant_park_factors_glob: "savant/park_factors/**/*.jsonl"

@@ -10,6 +10,8 @@ What's in the sample, and why:
   game_pk), a suspended-and-resumed game, a rescheduled game, a neutral site with no
   measured dimensions, and a postseason game. The rest are regular-season games picked
   by a fixed hash of game_pk, so the sample is the same on every run.
+- Players: every season row for the batters and pitchers in the sampled pitches, so
+  fct_plate_appearances' links to dim_players hold.
 - Venues, park dimensions, park factors and park environment in full (~2 MB). They're
   small, and dim_venue_seasons needs earlier seasons for its prior-season factors.
 
@@ -18,6 +20,7 @@ Re-run after changing a raw format or staging a new raw column:
 """
 
 import argparse
+import json
 import shutil
 from pathlib import Path
 
@@ -140,6 +143,24 @@ def write_statcast(con: duckdb.DuckDBPyConnection, game_pks: list[int]) -> None:
         """)
 
 
+def write_players(con: duckdb.DuckDBPyConnection) -> None:
+    """Player season rows for everyone who batted or pitched in the sampled pitches."""
+    sample = (OUT / "statcast/**/*.parquet").as_posix()
+    keep = {row[0] for row in con.sql(f"""
+        select batter from read_parquet('{sample}')
+        union
+        select pitcher from read_parquet('{sample}')
+    """).fetchall()}
+    for season_dir in sorted((RAW / "mlb/players").glob("season=*")):
+        dest = OUT / "mlb/players" / season_dir.name / "players.jsonl"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with open(season_dir / "players.jsonl") as f_in, open(dest, "w") as f_out:
+            for line in f_in:
+                # Keep the raw line as-is; only parse it to read the id.
+                if json.loads(line)["id"] in keep:
+                    f_out.write(line)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--regular-per-season", type=int, default=10,
@@ -153,6 +174,7 @@ def main() -> None:
     game_pks = pick_games(con, args.regular_per_season)
     write_schedule(con, game_pks)
     write_statcast(con, game_pks)
+    write_players(con)
     for rel in FULL_COPY:
         shutil.copytree(RAW / rel, OUT / rel)
 
