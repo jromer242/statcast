@@ -1,13 +1,26 @@
 -- One row per park, season and spray angle (whole degrees, -45 to 45): the wall's
 -- distance and height there, plus x/y feet from home plate for drawing the outline.
--- Uses the same wall_at_angle macro as fct_batted_balls. Only parks Savant measured.
+-- Uses the same wall_at_angle macro as fct_batted_balls. Only teams' home parks that
+-- Savant measured: one-off neutral sites (Williamsport, Rickwood, Bristol, Field of
+-- Dreams, Las Vegas) are left out, since nobody plays a season there.
 -- For the Streamlit app (see _app__exposures.yml).
 
-with parks as (
+-- A team's home that season: hosted games that weren't at a neutral site (20+ games,
+-- the same rule as dim_games.is_neutral_site).
+with home_parks as (
 
-    select *
-    from {{ ref('dim_venue_seasons') }}
-    where has_measured_dimensions
+    select distinct venue_id, season
+    from {{ ref('dim_games') }}
+    where not is_neutral_site
+
+),
+
+parks as (
+
+    select p.*
+    from {{ ref('dim_venue_seasons') }} p
+    join home_parks h using (venue_id, season)
+    where p.has_measured_dimensions
 
 ),
 

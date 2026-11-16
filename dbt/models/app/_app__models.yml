@@ -1,7 +1,7 @@
 models:
   - name: app_park_walls
     description: >
-      Every measured park's wall outline, one row per park, season and whole-degree
+      Every measured home park's wall outline (no one-off neutral sites), one row per park, season and whole-degree
       spray angle (-45 to 45). Built with the same wall_at_angle macro as
       fct_batted_balls. Feeds the Streamlit app's "spray vs park walls" page.
     data_tests:
