@@ -1,0 +1,6 @@
+# Streamlit Community Cloud installs this file (it looks next to the entry point first).
+# Kept small on purpose: the app only reads the Parquet files in data/.
+streamlit==1.67.0
+pandas==2.3.3
+pyarrow==22.0.0
+altair==6.3.0

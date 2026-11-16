@@ -1,0 +1,48 @@
+models:
+  - name: app_park_walls
+    description: >
+      Every measured park's wall outline, one row per park, season and whole-degree
+      spray angle (-45 to 45). Built with the same wall_at_angle macro as
+      fct_batted_balls. Feeds the Streamlit app's "spray vs park walls" page.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "venue_id || '-' || season || '-' || angle_deg"
+    columns:
+      - name: angle_deg
+        description: Spray angle in whole degrees; negative is left field.
+      - name: wall_distance_ft
+        data_tests: [not_null]
+      - name: x_ft
+        description: Feet left (negative) or right of the line from home plate to center field.
+      - name: y_ft
+        description: Feet from home plate toward center field.
+
+  - name: app_batted_balls
+    description: >
+      Fly balls and line drives with a distance and spray angle, trimmed to the columns
+      the app draws, with x/y landing coordinates in feet.
+    columns:
+      - name: pitch_id
+        data_tests: [unique, not_null]
+
+  - name: app_batter_seasons
+    description: >
+      Regular-season batting lines per batter and season for the app's leaderboards:
+      counting stats from completed plate appearances, rate stats, and contact
+      quality from batted balls.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "batter_id || '-' || season"
+    columns:
+      - name: team
+        description: The team with most of the batter's PAs that season.
+      - name: hr_per_pa
+        description: Home runs per completed plate appearance.
+      - name: woba
+        description: Savant's wOBA (see fct_plate_appearances.woba_value for how it differs from FanGraphs).
+      - name: hard_hit_rate
+        description: Share of batted balls hit 95 mph or harder.
+      - name: pulled_fly_ball_rate
+        description: Share of batted balls that were fly balls to the pull side, the profile that turns into home runs.

@@ -12,7 +12,7 @@ scripts/ingest_park_factors.py     -> data/raw/savant/park_factors/season=YYYY/*
                                    -> data/raw/savant/park_environment/season=YYYY/*.jsonl -> stg_savant__park_environment
 ```
 
-Two layers of models:
+Three layers of models:
 
 - **Staging** (`models/staging/<source>/`): one model per source table. Renames, fixes types,
   removes duplicates. No business logic.
@@ -22,6 +22,15 @@ Two layers of models:
   spray angle and the park's wall in that direction. `fct_plate_appearances` is one row per
   plate appearance, `dim_players` one row per player, and `dim_games` one row per game.
   Every mart has an enforced contract (see below).
+- **App** (`models/app/`): small extracts for the Streamlit app (`app_park_walls`,
+  `app_batted_balls`, `app_batter_seasons`), declared as a dbt **exposure** in
+  `_app__exposures.yml` so lineage shows what the app depends on.
+  `scripts/export_app_data.py` writes them to `app/data/` as Parquet.
+
+The wall interpolation (wall distance and height at any spray angle) lives in one macro,
+`macros/wall_at_angle.sql`. `fct_batted_balls` uses it for the park a ball was hit in,
+and `app_park_walls` for every park's outline, so they can't disagree. Moving the
+formula into the macro changed none of the 380,179 wall values (checked row by row).
 
 How they join:
 

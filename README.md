@@ -5,11 +5,22 @@
 A local data pipeline for MLB pitch-level data, built as the foundation for home run
 prediction models. It pulls Statcast pitches, the MLB schedule, venue details and park
 dimensions from public sources, then uses dbt to turn them into clean, tested
-DuckDB tables.
+DuckDB tables, and serves them in a Streamlit app.
 
 **Status:** ingestion, staging and the marts are done for 2024–2026 (2.3M pitches,
 560k plate appearances, 380k batted balls, 7,420 games, park data back to 2015). The
 modeling layer is next.
+
+## The app
+
+A Streamlit app ([app/](app/)) puts any hitter's fly balls and line drives on any park's
+walls ("would this have been a home run at Fenway?") and ranks hitters by season. It
+reads three small extracts that dbt builds for it (about 3 MB of Parquet in `app/data/`),
+so it runs anywhere without the 1.2 GB database. Run it locally:
+
+```bash
+.venv/bin/streamlit run app/streamlit_app.py
+```
 
 ## Architecture
 
@@ -73,7 +84,7 @@ flowchart LR
 
 ## Stack
 
-Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-duckdb · GitHub Actions
+Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-duckdb · Streamlit and Altair · GitHub Actions
 
 ## Problems worth reading about
 
@@ -139,7 +150,10 @@ python -m venv .venv
 .venv/bin/python scripts/ingest_players.py --season 2025
 
 # Build and test
-cd dbt && ../.venv/bin/dbt build
+cd dbt && ../.venv/bin/dbt build && cd ..
+
+# Refresh the app's data (commit the result)
+.venv/bin/python scripts/export_app_data.py
 ```
 
 The database is created at `data/statcast.duckdb`. Raw data and the database are not
@@ -151,6 +165,7 @@ committed; a full season of Statcast is about 105 MB of Parquet.
 scripts/      ingest scripts, one per source (shared helpers in common.py)
 dbt/          dbt project: sources, staging models, tests, data dictionary seed
 ci/fixtures/  small committed sample of the raw files that CI builds from
+app/          Streamlit app; app/data/ holds the Parquet extracts it reads
 data/         raw files and the DuckDB database (git-ignored)
 ```
 
@@ -164,6 +179,8 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] `fct_plate_appearances` and `dim_players`
 - [x] `dim_games`, and enforced contracts on every mart
 - [x] CI: dbt build and test on every push and pull request
+- [x] Streamlit app: spray charts on any park's walls, and leaderboards
+- [ ] Deploy the app on Streamlit Community Cloud
 - [ ] Scheduled daily runs
 - [ ] Home run prediction models
 

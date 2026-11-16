@@ -45,3 +45,6 @@ models:
     marts:
       # Marts are the tables analyses and models read from.
       +materialized: table
+    app:
+      # Small extracts for the Streamlit app, exported to app/data/ as Parquet.
+      +materialized: table

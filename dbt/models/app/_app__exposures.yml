@@ -1,0 +1,16 @@
+exposures:
+  - name: streamlit_app
+    label: Statcast HR explorer (Streamlit)
+    type: application
+    maturity: low
+    description: >
+      Public Streamlit app (app/streamlit_app.py): a hitter's fly balls and line drives
+      drawn on any park's walls, and season leaderboards. It reads Parquet files that
+      scripts/export_app_data.py writes from these models into app/data/, so the
+      deployed app never needs the full database.
+    depends_on:
+      - ref('app_park_walls')
+      - ref('app_batted_balls')
+      - ref('app_batter_seasons')
+    owner:
+      name: jromer242

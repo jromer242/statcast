@@ -1,4 +1,5 @@
-# Builds and tests every dbt model on each push and pull request.
+# Builds and tests every dbt model on each push and pull request, then smoke-tests
+# the Streamlit app.
 #
 # CI can't use data/raw/ (gitignored, ~340 MB) or run the ingest scripts (they call Savant
 # and the MLB API). It builds from ci/fixtures/raw instead: a few games per season, cut
@@ -53,3 +54,9 @@ jobs:
         # Second run takes fct_batted_balls' incremental branch (merge on the lookback
         # window), which the first run skips because the table doesn't exist yet.
         run: dbt build --target ci --select fct_batted_balls+
+
+      - name: Smoke-test the Streamlit app
+        # Runs every page headlessly against the committed extracts in app/data/ and
+        # fails on any exception.
+        working-directory: .
+        run: python ci/app_smoke_test.py
