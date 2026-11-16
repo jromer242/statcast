@@ -1,5 +1,7 @@
 # statcast
 
+[![dbt CI](https://github.com/jromer242/statcast/actions/workflows/dbt-ci.yml/badge.svg)](https://github.com/jromer242/statcast/actions/workflows/dbt-ci.yml)
+
 A local data pipeline for MLB pitch-level data, built as the foundation for home run
 prediction models. It pulls Statcast pitches, the MLB schedule, venue details and park
 dimensions from public sources, then uses dbt to turn them into clean, tested
@@ -51,10 +53,13 @@ flowchart LR
   incrementally.
 - **Tests:** 72 dbt tests run on every build, including cross-source checks
   ([dbt/README.md](dbt/README.md) lists each one and why it exists).
+- **CI:** GitHub Actions builds every model and runs every test on each push and pull
+  request, using a 4 MB committed sample of the raw data
+  ([how it works](dbt/README.md#ci)).
 
 ## Stack
 
-Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-duckdb
+Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-duckdb · GitHub Actions
 
 ## Problems worth reading about
 
@@ -124,6 +129,7 @@ committed; a full season of Statcast is about 105 MB of Parquet.
 ```
 scripts/      ingest scripts, one per source (shared helpers in common.py)
 dbt/          dbt project: sources, staging models, tests, data dictionary seed
+ci/fixtures/  small committed sample of the raw files that CI builds from
 data/         raw files and the DuckDB database (git-ignored)
 ```
 
@@ -134,6 +140,7 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] Park factors and park environment (Savant), prior-season only
 - [x] `dim_venue_seasons` mart
 - [x] Incremental batted-ball fact table (`fct_batted_balls`)
+- [x] CI: dbt build and test on every push and pull request
 - [ ] Scheduled daily runs
 - [ ] Home run prediction models
 

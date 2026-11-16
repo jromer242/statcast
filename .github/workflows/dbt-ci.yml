@@ -1,0 +1,55 @@
+# Builds and tests every dbt model on each push and pull request.
+#
+# CI can't use data/raw/ (gitignored, ~340 MB) or run the ingest scripts (they call Savant
+# and the MLB API). It builds from ci/fixtures/raw instead: a few games per season, cut
+# from the real raw files by scripts/make_ci_fixtures.py, with the edge cases staging
+# handles (postponed, suspended and rescheduled games, a neutral site, the postseason).
+# `--target ci` reads that sample and writes to ci/statcast_ci.duckdb.
+
+name: dbt CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the run still in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dbt-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: dbt
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: .
+        run: pip install -r requirements.txt
+
+      - name: Parse
+        # Fails fast on bad Jinja, YAML or refs before anything is built.
+        run: dbt parse --target ci
+
+      - name: Build and test (full)
+        # Every model and test, from empty, in dependency order.
+        run: dbt build --target ci
+
+      - name: Build and test (incremental)
+        # Second run takes fct_batted_balls' incremental branch (merge on the lookback
+        # window), which the first run skips because the table doesn't exist yet.
+        run: dbt build --target ci --select fct_batted_balls+

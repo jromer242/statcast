@@ -90,6 +90,36 @@ the model:
 test fails. Close any notebook connection to `statcast.duckdb` first. DuckDB allows only one
 writer, so an open connection blocks dbt (see the databases README).
 
+## CI
+
+[`.github/workflows/dbt-ci.yml`](../.github/workflows/dbt-ci.yml) runs on every push to
+`main` and every pull request: `dbt parse`, a full `dbt build`, then a second build of
+`fct_batted_balls+` so the incremental branch runs too.
+
+CI has no access to `data/raw/` (it's gitignored and ~340 MB), so it builds from
+`ci/fixtures/raw/`: about 4 MB, committed, with the same folder layout and file formats.
+It holds pitches and schedule rows for about 40 games across 2024–2026, plus every
+venue and park file. [`scripts/make_ci_fixtures.py`](../scripts/make_ci_fixtures.py)
+cuts it from the real raw files. It always includes the cases staging has to handle: a
+postponed game (two schedule rows for one `game_pk`), a suspended-and-resumed game, a
+rescheduled game, a neutral site with no measured dimensions, and a postseason game.
+The rest are regular-season games picked by a fixed hash of `game_pk`.
+
+`--target ci` switches both ends: sources read `raw_dir_ci` instead of `raw_dir`, and
+dbt writes to `ci/statcast_ci.duckdb` instead of `data/statcast.duckdb`. So fixture data
+can't end up in the dev database. To run CI locally:
+
+```bash
+../.venv/bin/dbt build --target ci
+```
+
+Re-run `python scripts/make_ci_fixtures.py` and commit the result after adding a raw
+column that staging reads, so the sample has it too.
+
+Limits: on about 40 games, the tests that count home parks (20+ games) have nothing to
+check, and the season-level checks on spray angle and wall distance use small samples.
+Those tests still run in full on the local build.
+
 ## Where tests live
 
 | Kind | Where | What it is |
