@@ -20,12 +20,13 @@ Two layers of models:
   `dim_venue_seasons` is one row per park per season with everything known about it
   *before* the season starts. `fct_batted_balls` is one row per ball in play, with its
   spray angle and the park's wall in that direction. `fct_plate_appearances` is one row per
-  plate appearance, and `dim_players` one row per player.
+  plate appearance, `dim_players` one row per player, and `dim_games` one row per game.
+  Every mart has an enforced contract (see below).
 
 How they join:
 
 ```
-stg_savant__pitches --game_pk--> stg_mlb__games --(venue_id, season)--> dim_venue_seasons
+stg_savant__pitches --game_pk--> dim_games --(venue_id, season)--> dim_venue_seasons
           \_____________________________________________________________________/
                                          |
                                   fct_batted_balls
@@ -137,8 +138,9 @@ Those tests still run in full on the local build.
 
 | Kind | Where | What it is |
 |---|---|---|
-| Generic tests | `data_tests:` under a column in `models/**/_*__models.yml` and `seeds/_seeds.yml` | Built-in checks (`unique`, `not_null`, `accepted_values`) applied to one column |
+| Generic tests | `data_tests:` under a column in `models/**/*.yml` and `seeds/_seeds.yml` | Built-in checks (`unique`, `not_null`, `accepted_values`) applied to one column |
 | Singular tests | `tests/*.sql`, described in `tests/_tests.yml` | A custom SQL query. **Every row it returns is a failure.** |
+| Constraints | `constraints:` in `models/marts/<model>.yml` | Primary keys and `not_null`, enforced by DuckDB when the table is written (see contracts below). |
 
 Both kinds pass when the test query returns zero rows. A test configured with `severity = 'warn'`
 reports its rows as a warning instead of failing the build. On failure, dbt prints the row count;
@@ -196,44 +198,35 @@ List every test: `../.venv/bin/dbt ls --resource-type test`
 |---|---|
 | `venue_id || '-' || season` unique; `venue_id`, `season`, `extra_distance_ft` not null | One measurement per park per season. |
 
-### `dim_venue_seasons` (mart: one row per venue per season)
-
-| Test | Why it matters |
-|---|---|
-| `venue_id || '-' || season` unique; `venue_id`, `season`, `venue_name` not null | Pitches join here through games. A duplicate would double count pitches. |
-
-### `fct_batted_balls` (mart: one row per ball in play)
-
-| Test | Why it matters |
-|---|---|
-| `pitch_id` unique, not null | The table's key. A duplicate means the incremental delete+insert broke. |
-| `game_pk` not null, and present in `stg_mlb__games` | Every batted ball needs a game to get its park. |
-| `venue_id`, `batter_id`, `is_home_run` not null | Join keys and the label. |
-| `batter_stand` in L, R; `batted_ball_type` in ground_ball, line_drive, fly_ball, popup; `spray_direction` in pull, center, oppo | Catches encoding changes before they split a feature. |
-
 ### `stg_mlb__players` (one row per player per season)
 
 | Test | Why it matters |
 |---|---|
 | `player_id || '-' || season` unique; `player_id`, `season`, `full_name`, `height_in` not null | One snapshot per player per season; `height_in` not null proves the text parse (`6' 2"`) worked. |
 
-### `dim_players` (mart: one row per player)
+### Marts: contracts and constraints
 
-| Test | Why it matters |
-|---|---|
-| `player_id` unique, not null; `full_name` not null | The join target for every batter and pitcher. |
-| `bats` in L, R, S; `throws` in L, R, S | `S` for throws looked like a bad value, but it's real: Carlos Cortes and Anthony Seigler are listed as ambidextrous throwers. The test caught them on its first run. |
+Every mart has an **enforced contract**: its YAML (`models/marts/<model>.yml`) lists every
+column with its data type, and dbt checks the model's SQL against that list *before*
+building. A renamed, dropped, added or retyped column fails the build with a table of
+mismatches, instead of quietly breaking whatever reads the mart. Primary keys and key
+`not_null` columns are **constraints**: DuckDB creates the table with them and refuses a
+violating row as it's written, so they replace the `unique`/`not_null` tests the marts
+used to have. Both were proven by breaking them on purpose: a `weight_lb` typed
+`integer` in the contract failed with `BIGINT` vs `INTEGER`, and a duplicated player row
+failed with `duplicate key "664056"`.
 
-### `fct_plate_appearances` (mart: one row per plate appearance)
+| Mart (grain) | Primary key | Other checks and why |
+|---|---|---|
+| `dim_venue_seasons` (venue per season) | `(venue_id, season)` | `venue_name` not null. Pitches join here through games; a duplicate would double count them. |
+| `dim_games` (game) | `game_pk` | `day_night` in day, night; `game_type` in R, F, D, L, W; `is_neutral_site`, `is_completed`, `has_pitch_data` not null. |
+| `dim_players` (player) | `player_id` | `bats` in L, R, S; `throws` in L, R, S. `S` for throws looked like a bad value, but it's real: Carlos Cortes and Anthony Seigler are listed as ambidextrous throwers. The test caught them on its first run. |
+| `fct_batted_balls` (ball in play) | `pitch_id` | `game_pk` in `dim_games`; `batter_id` in `dim_players`; `batter_stand`, `batted_ball_type`, `spray_direction` in fixed lists (catches encoding changes before they split a feature). The key catches a broken incremental delete+insert. |
+| `fct_plate_appearances` (plate appearance) | `pa_id` (`game_pk-at_bat_number`) | `game_pk` in `dim_games`; `batter_id`, `pitcher_id` in `dim_players` (catches a season loaded by `ingest.py` but not `ingest_players.py`); `batted_ball_pitch_id` unique and in `fct_batted_balls`; `pa_event` in a fixed list, so a new Savant event fails the build instead of quietly counting as an out; `outs_at_start` in 0, 1, 2. |
 
-| Test | Why it matters |
-|---|---|
-| `pa_id` unique, not null | The table's key (`game_pk-at_bat_number`). |
-| `game_pk` in `stg_mlb__games`; `venue_id` not null | Every PA gets its park. |
-| `batter_id`, `pitcher_id` in `dim_players` | Every player in Statcast is in the players pull. Catches a season loaded by `ingest.py` but not `ingest_players.py`. |
-| `batted_ball_pitch_id` unique, and in `fct_batted_balls` | The link to launch and wall data holds both ways. |
-| `pa_event` in a fixed list | A new Savant event fails the build instead of quietly counting as an out in `is_at_bat`. |
-| `outs_at_start` in 0, 1, 2; `is_completed_pa`, `is_at_bat` not null | Catches a broken first-pitch rollup. |
+`season` is an `integer` everywhere. It used to be `bigint` in the facts (from Savant's
+`game_year`) and `integer` in the dimensions; writing the contracts surfaced it, and
+`stg_savant__pitches` now casts it once.
 
 ### `savant_field_dictionary` (seed)
 

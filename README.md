@@ -35,6 +35,7 @@ flowchart LR
         M2[(fct_batted_balls)]
         M3[(fct_plate_appearances)]
         M4[(dim_players)]
+        M5[(dim_games)]
     end
     BS -->|ingest.py| R1 --> S1
     API -->|ingest_schedule.py<br/>ingest_venues.py<br/>ingest_players.py| R2 --> S2 & S3 & S5
@@ -44,6 +45,7 @@ flowchart LR
     S2 -- "venue_id, season" --> M1
     S1 & S2 & M1 --> M2
     S5 --> M4
+    S2 & S3 --> M5
     S1 & S2 --> M3
     M3 -- batted_ball_pitch_id --> M2
     M3 -- batter_id, pitcher_id --> M4
@@ -60,8 +62,10 @@ flowchart LR
   distance and height of that park's wall in the direction it went. It is built
   incrementally. `fct_plate_appearances` has one row per plate appearance (situation at
   the start, result at the end) and links to its batted ball; `dim_players` has one row
-  per player.
-- **Tests:** 102 dbt tests run on every build, including cross-source checks
+  per player, and `dim_games` one row per game.
+- **Tests and contracts:** 81 dbt tests run on every build, including cross-source checks.
+  Every mart also has an enforced contract (column names and types checked before
+  building) and primary key and not-null constraints enforced on write
   ([dbt/README.md](dbt/README.md) lists each one and why it exists).
 - **CI:** GitHub Actions builds every model and runs every test on each push and pull
   request, using a 4 MB committed sample of the raw data
@@ -158,6 +162,7 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] `dim_venue_seasons` mart
 - [x] Incremental batted-ball fact table (`fct_batted_balls`)
 - [x] `fct_plate_appearances` and `dim_players`
+- [x] `dim_games`, and enforced contracts on every mart
 - [x] CI: dbt build and test on every push and pull request
 - [ ] Scheduled daily runs
 - [ ] Home run prediction models

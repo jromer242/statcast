@@ -1,0 +1,76 @@
+models:
+  - name: dim_players
+    description: >
+      One row per player who appeared in MLB in a loaded season: name, birth date,
+      bats, throws, debut, and their most recent listed position, height and weight.
+      Type 1: the latest season snapshot wins. For values that change between seasons
+      (weight, position), join stg_mlb__players on (player_id, season) instead. Age
+      isn't stored; compute it from birth_date at the game date.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: player_id
+        data_type: bigint
+        description: MLBAM id, the same id Statcast uses for batter_id and pitcher_id. Primary key.
+        constraints: [{type: primary_key}]
+      - name: full_name
+        data_type: varchar
+        constraints: [{type: not_null}]
+      - name: first_name
+        data_type: varchar
+      - name: last_name
+        data_type: varchar
+      - name: use_first_name
+        data_type: varchar
+        description: The first name used day to day (Mike for Michael).
+      - name: boxscore_name
+        data_type: varchar
+        description: Short name as printed in box scores (Judge, A).
+      - name: birth_date
+        data_type: date
+      - name: birth_country
+        data_type: varchar
+      - name: mlb_debut_date
+        data_type: date
+      - name: draft_year
+        data_type: bigint
+        description: Null for players who signed as international free agents.
+      - name: bats
+        data_type: varchar
+        description: L, R or S (switch hitter). The side for a given PA is fct_plate_appearances.batter_stand.
+        constraints: [{type: not_null}]
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['L', 'R', 'S']
+      - name: throws
+        data_type: varchar
+        description: >
+          L or R, or S for the rare ambidextrous thrower (Carlos Cortes, Anthony Seigler
+          in 2025-26). The arm on a given pitch is fct_plate_appearances.pitcher_throws.
+        constraints: [{type: not_null}]
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['L', 'R', 'S']
+      - name: primary_position
+        data_type: varchar
+        description: Listed position in the latest season (P, C, 1B, ..., DH, TWP for two-way players).
+      - name: position_type
+        data_type: varchar
+        description: Pitcher, Catcher, Infielder, Outfielder, Hitter or Two-Way Player.
+      - name: height_in
+        data_type: integer
+        description: Listed height in inches, latest season.
+      - name: weight_lb
+        data_type: bigint
+        description: Listed weight in pounds, latest season.
+      - name: first_season_loaded
+        data_type: integer
+        description: First season this player appears in the loaded player data (not their debut; see mlb_debut_date).
+      - name: last_season_loaded
+        data_type: integer
+      - name: seasons_loaded
+        data_type: bigint
+        description: Loaded seasons the player appeared in.

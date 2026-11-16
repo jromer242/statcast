@@ -1,0 +1,166 @@
+models:
+  - name: dim_venue_seasons
+    description: >
+      One row per venue per season with everything known about the park before that
+      season starts: location, orientation, roof and turf (Stats API), measured
+      dimensions and wall heights (Savant, same season), and park factors and fly ball
+      carry from the previous season (Savant). Join pitches through dim_games on
+      (venue_id, season).
+
+
+      Leakage rule: park factors and environment come from season - 1, because they're
+      computed from a season's own batted balls. When `walls_changed` is true, those
+      prior factors describe the old walls.
+    config:
+      contract:
+        enforced: true
+    constraints:
+      - type: primary_key
+        columns: [venue_id, season]
+    columns:
+      # keys
+      - name: venue_id
+        data_type: bigint
+        constraints: [{type: not_null}]
+      - name: season
+        data_type: integer
+        constraints: [{type: not_null}]
+      - name: venue_name
+        data_type: varchar
+        constraints: [{type: not_null}]
+
+      # location and orientation (Stats API)
+      - name: city
+        data_type: varchar
+      - name: state
+        data_type: varchar
+      - name: country
+        data_type: varchar
+      - name: latitude
+        data_type: double
+      - name: longitude
+        data_type: double
+      - name: elevation_ft
+        data_type: bigint
+        description: Feet above sea level. Thinner air at altitude carries fly balls farther. Null for most neutral sites.
+      - name: azimuth_deg
+        data_type: double
+        description: >
+          Compass direction from home plate toward center field (0 = north, 90 = east).
+          Combine with wind direction to get wind blowing out vs in. Null for most neutral sites.
+      - name: time_zone
+        data_type: varchar
+        description: IANA time zone (America/New_York...). dim_games uses it for local start times.
+      - name: roof_type
+        data_type: varchar
+        description: Open, Retractable or Dome.
+      - name: turf_type
+        data_type: varchar
+        description: Grass or Artificial Turf.
+
+      # measured dimensions, same season (Savant)
+      - name: has_measured_dimensions
+        data_type: boolean
+        description: False for one-off neutral sites, which Savant doesn't measure.
+      - name: walls_changed
+        data_type: boolean
+        description: The walls moved or changed height since last season, so prior-season park factors describe the old park.
+      - name: distance_lf_line_ft
+        data_type: double
+        description: Measured distance to the wall down the left field line. The distance_* columns are null at neutral sites.
+      - name: distance_lf_gap_ft
+        data_type: double
+        description: Measured distance to the left-center gap. Savant doesn't publish the angle; fct_batted_balls assumes fence_gap_angle_deg.
+      - name: distance_cf_ft
+        data_type: double
+      - name: distance_rf_gap_ft
+        data_type: double
+      - name: distance_rf_line_ft
+        data_type: double
+      - name: distance_deepest_ft
+        data_type: double
+        description: The farthest point of the wall, wherever it is.
+      - name: avg_fence_distance_ft
+        data_type: double
+      - name: height_lf_line_ft
+        data_type: double
+        description: Wall height down the left field line. The height_* columns match the distance_* points.
+      - name: height_lf_gap_ft
+        data_type: double
+      - name: height_cf_ft
+        data_type: double
+      - name: height_rf_gap_ft
+        data_type: double
+      - name: height_rf_line_ft
+        data_type: double
+      - name: height_highest_ft
+        data_type: double
+        description: The tallest point of the wall (Fenway's Green Monster is 37 ft).
+      - name: avg_fence_height_ft
+        data_type: double
+      - name: fair_area_sqft
+        data_type: double
+        description: Fair territory in square feet. Bigger outfields turn fly balls into outs and gap hits.
+
+      # park factors from the previous season (leakage rule)
+      - name: park_factor_season
+        data_type: integer
+        description: The season the park factor and environment columns come from. Always season - 1.
+      - name: has_prior_park_factors
+        data_type: boolean
+        description: >
+          False when the park had no qualifying sample last season: neutral sites, or a
+          team's first season in a park (Sacramento and Steinbrenner Field in 2025).
+      - name: prior_pf_runs_3yr
+        data_type: integer
+        description: >
+          Run index over the three seasons before this one, all batters. Every prior_pf_*
+          column is an index where 100 = league average and 110 = 10% above.
+      - name: prior_pf_hr_3yr
+        data_type: integer
+        description: Home run index over the three seasons before this one, all batters.
+      - name: prior_pf_hr_3yr_lhb
+        data_type: integer
+        description: Same, left-handed batters only.
+      - name: prior_pf_hr_3yr_rhb
+        data_type: integer
+        description: Same, right-handed batters only.
+      - name: prior_pf_hits_3yr
+        data_type: integer
+      - name: prior_pf_2b_3yr
+        data_type: integer
+      - name: prior_pf_3b_3yr
+        data_type: integer
+      - name: prior_pf_bb_3yr
+        data_type: integer
+      - name: prior_pf_so_3yr
+        data_type: integer
+      - name: prior_pf_woba_3yr
+        data_type: integer
+      - name: prior_pf_hardhit_3yr
+        data_type: integer
+        description: Hard-hit rate index (95+ mph exit velocity). Mostly measures tracking differences between parks.
+      - name: prior_pf_n_pa_3yr
+        data_type: integer
+        description: Plate appearances behind the 3-year indexes. Small samples make noisy indexes.
+      - name: prior_pf_runs_1yr
+        data_type: integer
+      - name: prior_pf_hr_1yr
+        data_type: integer
+        description: Home run index from last season alone. Noisier than 3-year, but reacts faster to changes.
+      - name: prior_pf_n_pa_1yr
+        data_type: integer
+
+      # fly ball carry from the previous season (Savant), feet versus an average park
+      - name: prior_extra_distance_ft
+        data_type: double
+        description: Extra feet a fly ball carried here last season versus an average park. The sum of the four parts below.
+      - name: prior_elevation_extra_distance_ft
+        data_type: double
+      - name: prior_temperature_extra_distance_ft
+        data_type: double
+      - name: prior_roof_extra_distance_ft
+        data_type: double
+      - name: prior_environment_extra_distance_ft
+        data_type: double
+        description: Everything else (wind, humidity, park shape), as the residual Savant can't attribute.

@@ -31,7 +31,7 @@ renamed as (
 
         -- game context
         cast(game_date as date)                 as game_date,
-        game_year                               as season,
+        cast(game_year as integer)              as season,
         game_type,
         home_team,
         away_team,

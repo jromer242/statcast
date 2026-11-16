@@ -1,0 +1,186 @@
+models:
+  - name: fct_plate_appearances
+    description: >
+      One row per plate appearance (Savant at-bat) in regular-season and postseason
+      games: the batter, pitcher and park, the situation when it started, and how it
+      ended. The input table for the per-PA home run model and for rate stats
+      (HR/PA, K%, BB%).
+
+
+      About 0.2% of rows aren't real plate appearances: the inning ended while the
+      batter was up (caught stealing, pickoff), and the batter led off the next inning
+      with a fresh count. They have pa_event = 'truncated_pa' and is_completed_pa =
+      false. Filter on is_completed_pa before counting PAs.
+
+
+      Situation columns (`*_at_start`, inning, handedness) are known before the PA.
+      Result columns are outcomes; never use them to predict the same PA.
+    config:
+      contract:
+        enforced: true
+    columns:
+      # keys
+      - name: pa_id
+        data_type: varchar
+        description: game_pk-at_bat_number. Primary key.
+        constraints: [{type: primary_key}]
+      - name: game_pk
+        data_type: bigint
+        constraints: [{type: not_null}]
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_games')
+                field: game_pk
+      - name: at_bat_number
+        data_type: bigint
+        description: Order of the at-bat within the game (1 = first).
+      - name: venue_id
+        data_type: bigint
+        description: Where the game was played (not the home team's usual park).
+        constraints: [{type: not_null}]
+      - name: batter_id
+        data_type: bigint
+        constraints: [{type: not_null}]
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_players')
+                field: player_id
+      - name: pitcher_id
+        data_type: bigint
+        description: Pitcher on the last pitch of the PA.
+        constraints: [{type: not_null}]
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_players')
+                field: player_id
+
+      # game
+      - name: game_date
+        data_type: date
+      - name: season
+        data_type: integer
+        constraints: [{type: not_null}]
+      - name: game_type
+        data_type: varchar
+      - name: home_team
+        data_type: varchar
+        description: Statcast team abbreviation (NYY, LAD...). Same as dim_games.home_team_abbrev.
+      - name: away_team
+        data_type: varchar
+      - name: batting_team
+        data_type: varchar
+        description: The batter's team (away team in the top of the inning).
+      - name: fielding_team
+        data_type: varchar
+
+      # situation at the start (known before the PA)
+      - name: inning
+        data_type: bigint
+      - name: inning_topbot
+        data_type: varchar
+        description: Top or Bot.
+      - name: outs_at_start
+        data_type: bigint
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2]
+      - name: runner_on_1b_at_start
+        data_type: boolean
+      - name: runner_on_2b_at_start
+        data_type: boolean
+      - name: runner_on_3b_at_start
+        data_type: boolean
+      - name: bat_score_diff_at_start
+        data_type: bigint
+        description: Batting team's runs minus the fielding team's, before the first pitch.
+      - name: pitcher_times_through_order
+        data_type: bigint
+        description: 1 the first time the pitcher faces the lineup, 2 the second... Hitters do better each time through.
+      - name: batter_stand
+        data_type: varchar
+        description: Side the batter hit from (a switch hitter's side depends on the pitcher).
+      - name: pitcher_throws
+        data_type: varchar
+      - name: is_same_handed
+        data_type: boolean
+        description: Batter and pitcher on the same side (righty vs righty, lefty vs lefty), which favors the pitcher.
+      - name: pitchers_in_pa
+        data_type: bigint
+        description: More than 1 when the pitcher was changed during the PA.
+
+      # result (outcomes: never inputs for predicting this PA)
+      - name: pa_event
+        data_type: varchar
+        description: >
+          How the PA ended (single, strikeout, walk, field_out...), or truncated_pa when
+          the inning ended first. The list is fixed so a new Savant event fails the build
+          instead of quietly counting as an out.
+        constraints: [{type: not_null}]
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [
+                  'single', 'double', 'triple', 'home_run',
+                  'walk', 'intent_walk', 'hit_by_pitch', 'catcher_interf',
+                  'strikeout', 'strikeout_double_play',
+                  'field_out', 'force_out', 'grounded_into_double_play', 'double_play',
+                  'triple_play', 'fielders_choice', 'fielders_choice_out', 'field_error',
+                  'sac_fly', 'sac_fly_double_play', 'sac_bunt', 'sac_bunt_double_play',
+                  'truncated_pa'
+                ]
+      - name: is_completed_pa
+        data_type: boolean
+        description: False when the inning ended during the PA. Counts as a PA in official stats only when true.
+        constraints: [{type: not_null}]
+      - name: pitches
+        data_type: bigint
+        description: Pitches thrown in the PA.
+      - name: final_balls
+        data_type: bigint
+        description: Count before the last pitch.
+      - name: final_strikes
+        data_type: bigint
+      - name: is_hit
+        data_type: boolean
+        description: Single, double, triple or home run. Reaching on an error isn't a hit.
+      - name: is_home_run
+        data_type: boolean
+      - name: is_strikeout
+        data_type: boolean
+      - name: is_walk
+        data_type: boolean
+        description: Includes intentional walks.
+      - name: is_hit_by_pitch
+        data_type: boolean
+      - name: is_at_bat
+        data_type: boolean
+        description: Official at bat. Excludes walks, HBP, sacrifices, catcher interference and truncated PAs.
+        constraints: [{type: not_null}]
+      - name: total_bases
+        data_type: integer
+        description: 1 single, 2 double, 3 triple, 4 home run, else 0. Sum over at bats for slugging.
+      - name: batted_ball_pitch_id
+        data_type: varchar
+        description: The ball in play that ended the PA, if any. Join to fct_batted_balls for launch and wall data.
+        data_tests:
+          - unique
+          - relationships:
+              arguments:
+                to: ref('fct_batted_balls')
+                field: pitch_id
+      - name: woba_value
+        data_type: double
+        description: >
+          Savant's wOBA credit for the PA. Savant uses rounded weights (single 0.9, walk
+          0.7, HR 2.0) and credits reaching on an error or fielder's choice like a single,
+          so league wOBA here (~.322 in 2024) runs above FanGraphs' (~.310).
+      - name: woba_denom
+        data_type: bigint
+        description: 1 for PAs that count toward wOBA; 0 or null for intentional walks, sac bunts and truncated PAs.
+      - name: run_value
+        data_type: double
+        description: Change in run expectancy over the PA (sum of delta_run_exp across its pitches).

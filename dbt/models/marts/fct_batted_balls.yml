@@ -1,0 +1,198 @@
+models:
+  - name: fct_batted_balls
+    description: >
+      One row per batted ball (pitch put in play) in regular-season and postseason
+      games, with its venue and where it went relative to that park's wall. The input
+      table for a batted-ball home run model: replay a hitter's batted balls against
+      every park's walls to estimate park fit.
+
+
+      Built incrementally (rebuilds the last `batted_balls_lookback_days` days each run).
+      Run `dbt build --full-refresh --select fct_batted_balls` after loading park
+      dimensions, re-pulling older pitches, or changing the model.
+
+
+      Contact columns (launch_speed, launch_angle, hit_distance, spray) are outcomes of
+      the pitch. Use them for batted-ball models, never to predict a plate appearance
+      before it happens.
+    config:
+      contract:
+        enforced: true
+    columns:
+      # keys
+      - name: pitch_id
+        data_type: varchar
+        description: The pitch that was put in play (game_pk-at_bat_number-pitch_number). Primary key.
+        constraints: [{type: primary_key}]
+      - name: game_pk
+        data_type: bigint
+        constraints: [{type: not_null}]
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_games')
+                field: game_pk
+      - name: at_bat_number
+        data_type: bigint
+        description: Joins to fct_plate_appearances with game_pk (pa_id = game_pk-at_bat_number).
+      - name: pitch_number
+        data_type: bigint
+        description: Pitch of the at-bat (1 = first).
+      - name: game_date
+        data_type: date
+      - name: season
+        data_type: integer
+        constraints: [{type: not_null}]
+      - name: game_type
+        data_type: varchar
+      - name: venue_id
+        data_type: bigint
+        description: Where the game was played (not the home team's usual park).
+        constraints: [{type: not_null}]
+
+      # players
+      - name: batter_id
+        data_type: bigint
+        constraints: [{type: not_null}]
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_players')
+                field: player_id
+      - name: pitcher_id
+        data_type: bigint
+        constraints: [{type: not_null}]
+      - name: batter_stand
+        data_type: varchar
+        description: Side the batter hit from on this pitch (a switch hitter's side depends on the pitcher).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['L', 'R']
+      - name: pitcher_throws
+        data_type: varchar
+
+      # situation before the pitch
+      - name: inning
+        data_type: bigint
+      - name: inning_topbot
+        data_type: varchar
+      - name: outs_when_up
+        data_type: bigint
+      - name: balls
+        data_type: bigint
+        description: Count before the pitch.
+      - name: strikes
+        data_type: bigint
+
+      # pitch
+      - name: pitch_type
+        data_type: varchar
+        description: Savant pitch code (FF four-seam, SL slider, CH changeup...).
+      - name: release_speed
+        data_type: double
+        description: Pitch speed out of the hand, mph.
+      - name: plate_x
+        data_type: double
+        description: Horizontal location crossing the plate, feet from the center, catcher's view.
+      - name: plate_z
+        data_type: double
+        description: Height crossing the plate, feet above the ground.
+
+      # swing (bat tracking, 2023 onward)
+      - name: bat_speed
+        data_type: double
+        description: Speed of the sweet spot at contact, mph. Null when bat tracking missed the swing.
+      - name: swing_length
+        data_type: double
+        description: Distance the bat head traveled, feet.
+      - name: attack_angle
+        data_type: double
+        description: Vertical angle of the bat's path at contact, degrees.
+
+      # contact
+      - name: batted_ball_type
+        data_type: varchar
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['ground_ball', 'line_drive', 'fly_ball', 'popup']
+      - name: launch_speed
+        data_type: double
+        description: Exit velocity, mph.
+      - name: launch_angle
+        data_type: bigint
+        description: Vertical launch angle, whole degrees.
+      - name: hit_distance
+        data_type: bigint
+        description: Projected distance in feet (where it landed or would have landed).
+      - name: hc_x
+        data_type: double
+        description: Savant's hit coordinate, x (pixels on a field diagram). Input to spray_angle_deg.
+      - name: hc_y
+        data_type: double
+      - name: has_launch_data
+        data_type: boolean
+        description: False for under 1% of batted balls the tracking system missed. Exclude or impute before modeling.
+      - name: has_hit_coordinates
+        data_type: boolean
+        description: False when Savant has no hit coordinates, so no spray angle or wall.
+
+      # direction
+      - name: spray_angle_deg
+        data_type: double
+        description: >
+          Horizontal direction from home plate: 0 is dead center, -45 the left field line,
+          +45 the right field line. Computed from Savant's hit coordinates (hc_x, hc_y).
+      - name: pull_angle_deg
+        data_type: double
+        description: spray_angle_deg with the sign flipped for right-handed batters, so positive always means the pull side.
+      - name: spray_direction
+        data_type: varchar
+        description: pull, center or oppo, split at +-15 degrees of pull_angle_deg.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['pull', 'center', 'oppo']
+
+      # the wall where the ball went
+      - name: wall_distance_at_spray_ft
+        data_type: double
+        description: >
+          Distance to the wall at the ball's spray angle, linearly interpolated between
+          Savant's measured line, gap and center distances. Gap angle is the
+          fence_gap_angle_deg var. Null at neutral sites without measured dimensions.
+      - name: wall_height_at_spray_ft
+        data_type: double
+        description: Wall height at the ball's spray angle, interpolated the same way.
+      - name: distance_past_wall_ft
+        data_type: double
+        description: hit_distance minus wall_distance_at_spray_ft. Positive means the ball would have landed beyond the wall.
+
+      # labels
+      - name: pa_event
+        data_type: varchar
+        description: How the plate appearance ended. Same values as fct_plate_appearances.pa_event.
+      - name: is_home_run
+        data_type: boolean
+        description: Any home run, including inside-the-park.
+        constraints: [{type: not_null}]
+      - name: is_inside_the_park_hr
+        data_type: boolean
+      - name: is_over_fence_hr
+        data_type: boolean
+        description: Home runs that cleared the wall. The label for park-fit models, since inside-the-park home runs don't depend on the walls.
+
+      # Savant's expected stats from launch speed and angle (benchmarks to beat)
+      - name: xba
+        data_type: double
+        description: Expected batting average from launch speed and angle.
+      - name: xslg
+        data_type: double
+      - name: xwoba
+        data_type: double
+
+      # lineage
+      - name: _ingested_at
+        data_type: timestamp with time zone
+        description: When the pitch's raw file was written by scripts/ingest.py.
