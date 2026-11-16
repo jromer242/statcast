@@ -1,7 +1,7 @@
 .venv/
 logs/
 # Raw files, the DuckDB database and local exports: none of data/ is committed
-data/
+/data/
 *.duckdb
 __pycache__/
 .ipynb_checkpoints/
