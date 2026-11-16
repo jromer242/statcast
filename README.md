@@ -189,3 +189,9 @@ data/         raw files and the DuckDB database (git-ignored)
 [Baseball Savant](https://baseballsavant.mlb.com) and the
 [MLB Stats API](https://statsapi.mlb.com). Data belongs to MLB Advanced Media. This is a
 personal learning project; requests are made once per season with pauses between them.
+
+## License
+
+The code is under the [MIT License](LICENSE). The license doesn't cover the data: the
+Statcast and MLB data, including the small samples committed in `ci/fixtures/` and
+`app/data/`, belongs to MLB Advanced Media.
