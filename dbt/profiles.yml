@@ -7,3 +7,10 @@ statcast:
       type: duckdb
       path: ../data/statcast.duckdb
       threads: 4
+    # CI (and local checks of it): builds from the committed sample in ci/fixtures/raw
+    # into its own database file, so it can never overwrite dev tables. The sources
+    # switch their input folder on this target name (raw_dir_ci in dbt_project.yml).
+    ci:
+      type: duckdb
+      path: ../ci/statcast_ci.duckdb
+      threads: 4

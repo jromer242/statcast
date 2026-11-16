@@ -9,7 +9,7 @@ sources:
           the season=YYYY folder name and `filename` records which file a row came from.
         config:
           external_location: >-
-            read_parquet('{{ var("raw_statcast_glob") }}',
+            read_parquet('{{ var("raw_dir_ci") if target.name == "ci" else var("raw_dir") }}/{{ var("raw_statcast_glob") }}',
                          hive_partitioning = true,
                          union_by_name = true,
                          filename = true)
@@ -22,7 +22,7 @@ sources:
           (venue_id, season_id) is unique. Available from 2015.
         config:
           external_location: >-
-            read_json('{{ var("raw_savant_park_dimensions_glob") }}',
+            read_json('{{ var("raw_dir_ci") if target.name == "ci" else var("raw_dir") }}/{{ var("raw_savant_park_dimensions_glob") }}',
                       format = 'newline_delimited',
                       hive_partitioning = true,
                       union_by_name = true,
@@ -37,7 +37,7 @@ sources:
           Computed from that season's batted balls, so these describe the past.
         config:
           external_location: >-
-            read_json('{{ var("raw_savant_park_factors_glob") }}',
+            read_json('{{ var("raw_dir_ci") if target.name == "ci" else var("raw_dir") }}/{{ var("raw_savant_park_factors_glob") }}',
                       format = 'newline_delimited',
                       hive_partitioning = true,
                       union_by_name = true,
@@ -51,7 +51,7 @@ sources:
           environment. One line per park per season. Every value arrives as a string.
         config:
           external_location: >-
-            read_json('{{ var("raw_savant_park_environment_glob") }}',
+            read_json('{{ var("raw_dir_ci") if target.name == "ci" else var("raw_dir") }}/{{ var("raw_savant_park_environment_glob") }}',
                       format = 'newline_delimited',
                       hive_partitioning = true,
                       union_by_name = true,

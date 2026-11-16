@@ -10,16 +10,23 @@ test-paths: ["tests"]
 clean-targets: ["target", "dbt_packages"]
 
 vars:
-  # Raw Parquet written by scripts/ingest.py, relative to this dbt/ folder.
-  raw_statcast_glob: "../data/raw/statcast/**/*.parquet"
+  # Folders with the raw files, relative to this dbt/ folder. `--target ci` reads
+  # raw_dir_ci, the small committed sample built by scripts/make_ci_fixtures.py, and
+  # writes to its own database (profiles.yml). Tying both to the target means fixture
+  # data can never be built into the dev database.
+  raw_dir: "../data/raw"
+  raw_dir_ci: "../ci/fixtures/raw"
+  # The globs below are relative to raw_dir.
+  # Raw Parquet written by scripts/ingest.py.
+  raw_statcast_glob: "statcast/**/*.parquet"
   # Raw JSON lines written by scripts/ingest_schedule.py.
-  raw_mlb_schedule_glob: "../data/raw/mlb/schedule/**/*.jsonl"
+  raw_mlb_schedule_glob: "mlb/schedule/**/*.jsonl"
   # Raw JSON lines written by scripts/ingest_venues.py and scripts/ingest_park_dimensions.py.
-  raw_mlb_venues_glob: "../data/raw/mlb/venues/**/*.jsonl"
-  raw_savant_park_dimensions_glob: "../data/raw/savant/park_dimensions/**/*.jsonl"
+  raw_mlb_venues_glob: "mlb/venues/**/*.jsonl"
+  raw_savant_park_dimensions_glob: "savant/park_dimensions/**/*.jsonl"
   # Raw JSON lines written by scripts/ingest_park_factors.py.
-  raw_savant_park_factors_glob: "../data/raw/savant/park_factors/**/*.jsonl"
-  raw_savant_park_environment_glob: "../data/raw/savant/park_environment/**/*.jsonl"
+  raw_savant_park_factors_glob: "savant/park_factors/**/*.jsonl"
+  raw_savant_park_environment_glob: "savant/park_environment/**/*.jsonl"
 
   # fct_batted_balls: days before the newest loaded game to rebuild on each incremental run.
   batted_balls_lookback_days: 7
