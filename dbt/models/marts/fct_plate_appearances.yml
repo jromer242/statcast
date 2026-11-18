@@ -21,9 +21,15 @@ models:
     columns:
       # keys
       - name: pa_id
-        data_type: varchar
+        data_type: string
         description: game_pk-at_bat_number. Primary key.
         constraints: [{type: primary_key}]
+        data_tests:
+          # BigQuery records primary keys but doesn't enforce them (DuckDB does), so
+          # uniqueness is tested there instead.
+          - unique:
+              config:
+                enabled: "{{ target.type == 'bigquery' }}"
       - name: game_pk
         data_type: bigint
         constraints: [{type: not_null}]
@@ -64,23 +70,23 @@ models:
         data_type: integer
         constraints: [{type: not_null}]
       - name: game_type
-        data_type: varchar
+        data_type: string
       - name: home_team
-        data_type: varchar
+        data_type: string
         description: Statcast team abbreviation (NYY, LAD...). Same as dim_games.home_team_abbrev.
       - name: away_team
-        data_type: varchar
+        data_type: string
       - name: batting_team
-        data_type: varchar
+        data_type: string
         description: The batter's team (away team in the top of the inning).
       - name: fielding_team
-        data_type: varchar
+        data_type: string
 
       # situation at the start (known before the PA)
       - name: inning
         data_type: bigint
       - name: inning_topbot
-        data_type: varchar
+        data_type: string
         description: Top or Bot.
       - name: outs_at_start
         data_type: bigint
@@ -88,12 +94,13 @@ models:
           - accepted_values:
               arguments:
                 values: [0, 1, 2]
+                quote: false
       - name: runner_on_1b_at_start
-        data_type: boolean
+        data_type: bool
       - name: runner_on_2b_at_start
-        data_type: boolean
+        data_type: bool
       - name: runner_on_3b_at_start
-        data_type: boolean
+        data_type: bool
       - name: bat_score_diff_at_start
         data_type: bigint
         description: Batting team's runs minus the fielding team's, before the first pitch.
@@ -101,12 +108,12 @@ models:
         data_type: bigint
         description: 1 the first time the pitcher faces the lineup, 2 the second... Hitters do better each time through.
       - name: batter_stand
-        data_type: varchar
+        data_type: string
         description: Side the batter hit from (a switch hitter's side depends on the pitcher).
       - name: pitcher_throws
-        data_type: varchar
+        data_type: string
       - name: is_same_handed
-        data_type: boolean
+        data_type: bool
         description: Batter and pitcher on the same side (righty vs righty, lefty vs lefty), which favors the pitcher.
       - name: pitchers_in_pa
         data_type: bigint
@@ -114,7 +121,7 @@ models:
 
       # result (outcomes: never inputs for predicting this PA)
       - name: pa_event
-        data_type: varchar
+        data_type: string
         description: >
           How the PA ended (single, strikeout, walk, field_out...), or truncated_pa when
           the inning ended first. The list is fixed so a new Savant event fails the build
@@ -133,7 +140,7 @@ models:
                   'truncated_pa'
                 ]
       - name: is_completed_pa
-        data_type: boolean
+        data_type: bool
         description: False when the inning ended during the PA. Counts as a PA in official stats only when true.
         constraints: [{type: not_null}]
       - name: pitches
@@ -145,26 +152,26 @@ models:
       - name: final_strikes
         data_type: bigint
       - name: is_hit
-        data_type: boolean
+        data_type: bool
         description: Single, double, triple or home run. Reaching on an error isn't a hit.
       - name: is_home_run
-        data_type: boolean
+        data_type: bool
       - name: is_strikeout
-        data_type: boolean
+        data_type: bool
       - name: is_walk
-        data_type: boolean
+        data_type: bool
         description: Includes intentional walks.
       - name: is_hit_by_pitch
-        data_type: boolean
+        data_type: bool
       - name: is_at_bat
-        data_type: boolean
+        data_type: bool
         description: Official at bat. Excludes walks, HBP, sacrifices, catcher interference and truncated PAs.
         constraints: [{type: not_null}]
       - name: total_bases
         data_type: integer
         description: 1 single, 2 double, 3 triple, 4 home run, else 0. Sum over at bats for slugging.
       - name: batted_ball_pitch_id
-        data_type: varchar
+        data_type: string
         description: The ball in play that ended the PA, if any. Join to fct_batted_balls for launch and wall data.
         data_tests:
           - unique
@@ -173,7 +180,7 @@ models:
                 to: ref('fct_batted_balls')
                 field: pitch_id
       - name: woba_value
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: >
           Savant's wOBA credit for the PA. Savant uses rounded weights (single 0.9, walk
           0.7, HR 2.0) and credits reaching on an error or fielder's choice like a single,
@@ -182,5 +189,5 @@ models:
         data_type: bigint
         description: 1 for PAs that count toward wOBA; 0 or null for intentional walks, sac bunts and truncated PAs.
       - name: run_value
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Change in run expectancy over the PA (sum of delta_run_exp across its pitches).

@@ -14,6 +14,12 @@ models:
         data_type: bigint
         description: MLB game id. Primary key; Statcast pitches join on it.
         constraints: [{type: primary_key}]
+        data_tests:
+          # BigQuery records primary keys but doesn't enforce them (DuckDB does), so
+          # uniqueness is tested there instead.
+          - unique:
+              config:
+                enabled: "{{ target.type == 'bigquery' }}"
       - name: venue_id
         data_type: bigint
         description: Where the game was played (not the home team's usual park). Join dim_venue_seasons on (venue_id, season).
@@ -37,13 +43,13 @@ models:
         data_type: timestamp
         description: Scheduled start in UTC (no time zone stored). Night games in the Americas fall on the next UTC day.
       - name: game_datetime_local
-        data_type: timestamp
+        data_type: datetime
         description: Scheduled start in the park's local time, from the venue's time zone.
       - name: local_start_hour
         data_type: bigint
         description: Hour of the local start (0-23). Day games start 11-17, night games 16-20.
       - name: day_night
-        data_type: varchar
+        data_type: string
         description: day or night, as MLB classifies the game.
         data_tests:
           - accepted_values:
@@ -52,18 +58,18 @@ models:
 
       # what kind of game
       - name: game_type
-        data_type: varchar
+        data_type: string
         description: R regular season, F wild card, D division series, L LCS, W World Series.
         data_tests:
           - accepted_values:
               arguments:
                 values: ['R', 'F', 'D', 'L', 'W']
       - name: is_postseason
-        data_type: boolean
+        data_type: bool
       - name: series_description
-        data_type: varchar
+        data_type: string
       - name: double_header
-        data_type: varchar
+        data_type: string
         description: N = not a doubleheader, Y = traditional (one ticket, back to back), S = split (separate admissions).
       - name: game_number
         data_type: bigint
@@ -74,9 +80,9 @@ models:
 
       # where and who
       - name: venue_name
-        data_type: varchar
+        data_type: string
       - name: is_neutral_site
-        data_type: boolean
+        data_type: bool
         description: >
           The venue hosted fewer than 20 completed games that season, so it isn't a
           team's home park: Tokyo, London, Seoul, Mexico City, Williamsport, Rickwood,
@@ -84,34 +90,34 @@ models:
           assert_home_parks_* tests.
         constraints: [{type: not_null}]
       - name: home_team_name
-        data_type: varchar
+        data_type: string
       - name: away_team_name
-        data_type: varchar
+        data_type: string
       - name: home_team_abbrev
-        data_type: varchar
+        data_type: string
         description: Statcast's abbreviation (NYY, LAD...), the value fct_plate_appearances uses for batting_team. Null when the game has no pitch data.
       - name: away_team_abbrev
-        data_type: varchar
+        data_type: string
 
       # status
       - name: status
-        data_type: varchar
+        data_type: string
         description: Final, Completed Early, Cancelled, or a live status (Scheduled, In Progress) during the season.
       - name: is_completed
-        data_type: boolean
+        data_type: bool
         description: Final or Completed Early (a shortened game that counts).
         constraints: [{type: not_null}]
       - name: status_reason
-        data_type: varchar
+        data_type: string
         description: Why a game was postponed, cancelled or ended early (Rain, Inclement Weather...).
       - name: was_suspended
-        data_type: boolean
+        data_type: bool
         description: The game was suspended and finished on a later date. Its pitches span two dates.
       - name: was_rescheduled
-        data_type: boolean
+        data_type: bool
         description: The game was moved from its original date.
       - name: has_pitch_data
-        data_type: boolean
+        data_type: bool
         description: Statcast has pitches for this game. False for cancelled games.
         constraints: [{type: not_null}]
       - name: pitches

@@ -54,7 +54,7 @@ models:
     data_tests:
       - unique:
           arguments:
-            column_name: "venue_id || '-' || season"
+            column_name: "cast(venue_id as string) || '-' || cast(season as string)"
     columns:
       - name: venue_id
         data_tests: [not_null]
@@ -90,7 +90,7 @@ models:
     data_tests:
       - unique:
           arguments:
-            column_name: "player_id || '-' || season"
+            column_name: "cast(player_id as string) || '-' || cast(season as string)"
     columns:
       - name: player_id
         description: MLBAM id, the same id Statcast uses for batter_id and pitcher_id.

@@ -36,11 +36,11 @@ select
     -- don't always line up (Fenway's 420 sign is listed as center). Use Savant's measured
     -- distances for modeling.
     fieldInfo.leftLine                          as posted_left_line_ft,
-    fieldInfo."left"                            as posted_left_ft,
+    fieldInfo.{{ adapter.quote('left') }}       as posted_left_ft,
     fieldInfo.leftCenter                        as posted_left_center_ft,
     fieldInfo.center                            as posted_center_ft,
     fieldInfo.rightCenter                       as posted_right_center_ft,
-    fieldInfo."right"                           as posted_right_ft,
+    fieldInfo.{{ adapter.quote('right') }}      as posted_right_ft,
     fieldInfo.rightLine                         as posted_right_line_ft,
 
     -- lineage

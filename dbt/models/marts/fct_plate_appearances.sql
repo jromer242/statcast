@@ -13,6 +13,19 @@
 --
 -- Situation columns (inning, outs, runners, score) are from the first pitch, so they're
 -- known before the PA starts. Result columns are outcomes: never model inputs for this PA.
+-- first_by / last_by (macros/cross_db.sql) read a column on the PA's first or last pitch,
+-- keeping NULLs: a runner who reaches second during the PA isn't "on second at the start".
+--
+-- On BigQuery: partitioned by month, clustered by batter and pitcher, and the post-hook
+-- adds row-level security (macros/row_access_policies.sql). All three are no-ops on DuckDB.
+
+{{
+    config(
+        partition_by=bq_partition_by('game_date'),
+        cluster_by=bq_cluster_by(['batter_id', 'pitcher_id']),
+        post_hook="{{ row_access_policies() }}"
+    )
+}}
 
 with pitches as (
 
@@ -30,41 +43,41 @@ encounters as (
         at_bat_number,
 
         -- situation at the first pitch
-        arg_min(inning, pitch_number)                       as inning,
-        arg_min(inning_topbot, pitch_number)                as inning_topbot,
-        arg_min(outs_when_up, pitch_number)                 as outs_at_start,
-        arg_min(runner_on_1b_id, pitch_number) is not null  as runner_on_1b_at_start,
-        arg_min(runner_on_2b_id, pitch_number) is not null  as runner_on_2b_at_start,
-        arg_min(runner_on_3b_id, pitch_number) is not null  as runner_on_3b_at_start,
-        arg_min(bat_score_diff, pitch_number)               as bat_score_diff_at_start,
-        arg_min(pitcher_times_through_order, pitch_number)  as pitcher_times_through_order,
+        {{ first_by('inning', 'pitch_number') }}                        as inning,
+        {{ first_by('inning_topbot', 'pitch_number') }}                 as inning_topbot,
+        {{ first_by('outs_when_up', 'pitch_number') }}                  as outs_at_start,
+        {{ first_by('runner_on_1b_id', 'pitch_number') }} is not null   as runner_on_1b_at_start,
+        {{ first_by('runner_on_2b_id', 'pitch_number') }} is not null   as runner_on_2b_at_start,
+        {{ first_by('runner_on_3b_id', 'pitch_number') }} is not null   as runner_on_3b_at_start,
+        {{ first_by('bat_score_diff', 'pitch_number') }}                as bat_score_diff_at_start,
+        {{ first_by('pitcher_times_through_order', 'pitch_number') }}   as pitcher_times_through_order,
 
         -- players: the last pitch's batter and pitcher are the ones the result is
         -- charged to in the common case (a mid-PA pitching change is rare)
-        arg_max(batter_id, pitch_number)                    as batter_id,
-        arg_max(pitcher_id, pitch_number)                   as pitcher_id,
-        arg_max(batter_stand, pitch_number)                 as batter_stand,
-        arg_max(pitcher_throws, pitch_number)               as pitcher_throws,
-        count(distinct pitcher_id)                          as pitchers_in_pa,
+        {{ last_by('batter_id', 'pitch_number') }}                      as batter_id,
+        {{ last_by('pitcher_id', 'pitch_number') }}                     as pitcher_id,
+        {{ last_by('batter_stand', 'pitch_number') }}                   as batter_stand,
+        {{ last_by('pitcher_throws', 'pitch_number') }}                 as pitcher_throws,
+        count(distinct pitcher_id)                                      as pitchers_in_pa,
 
         -- result, from the last pitch
-        count(*)                                            as pitches,
-        arg_max(balls, pitch_number)                        as final_balls,
-        arg_max(strikes, pitch_number)                      as final_strikes,
-        arg_max(pa_event, pitch_number)                     as raw_pa_event,
-        arg_max(pitch_result_type, pitch_number)            as last_pitch_result_type,
-        arg_max(batted_ball_type, pitch_number)             as last_pitch_batted_ball_type,
-        arg_max(pitch_id, pitch_number)                     as last_pitch_id,
-        arg_max(woba_value, pitch_number)                   as woba_value,
-        arg_max(woba_denom, pitch_number)                   as woba_denom,
-        sum(delta_run_exp)                                  as run_value,
+        count(*)                                                        as pitches,
+        {{ last_by('balls', 'pitch_number') }}                          as final_balls,
+        {{ last_by('strikes', 'pitch_number') }}                        as final_strikes,
+        {{ last_by('pa_event', 'pitch_number') }}                       as raw_pa_event,
+        {{ last_by('pitch_result_type', 'pitch_number') }}              as last_pitch_result_type,
+        {{ last_by('batted_ball_type', 'pitch_number') }}               as last_pitch_batted_ball_type,
+        {{ last_by('pitch_id', 'pitch_number') }}                       as last_pitch_id,
+        {{ last_by('woba_value', 'pitch_number') }}                     as woba_value,
+        {{ last_by('woba_denom', 'pitch_number') }}                     as woba_denom,
+        sum(delta_run_exp)                                              as run_value,
 
         -- game context (same on every pitch)
-        any_value(game_date)                                as game_date,
-        any_value(season)                                   as season,
-        any_value(game_type)                                as game_type,
-        any_value(home_team)                                as home_team,
-        any_value(away_team)                                as away_team
+        any_value(game_date)                                            as game_date,
+        any_value(season)                                               as season,
+        any_value(game_type)                                            as game_type,
+        any_value(home_team)                                            as home_team,
+        any_value(away_team)                                            as away_team
 
     from pitches
     group by game_pk, at_bat_number
@@ -88,7 +101,7 @@ labeled as (
 
 select
     -- keys
-    l.game_pk || '-' || l.at_bat_number                     as pa_id,
+    cast(l.game_pk as string) || '-' || cast(l.at_bat_number as string)  as pa_id,
     l.game_pk,
     l.at_bat_number,
     g.venue_id,

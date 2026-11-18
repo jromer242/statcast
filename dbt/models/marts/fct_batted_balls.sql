@@ -1,10 +1,15 @@
 -- One row per batted ball (a pitch put in play) in regular-season and postseason games,
 -- with its park and where it went relative to that park's wall.
 --
--- Grain: pitch_id. Built incrementally: each run rebuilds the last
--- `batted_balls_lookback_days` days before the newest game already loaded (Savant
--- corrects recent data for a few days). After loading park dimensions, re-pulling
--- older pitches, or changing this logic, run with --full-refresh.
+-- Grain: pitch_id. Built incrementally: each run rebuilds from the start of the month
+-- that holds the day `batted_balls_lookback_days` before the newest game already loaded
+-- (Savant corrects recent data for a few days). After loading park dimensions,
+-- re-pulling older pitches, or changing this logic, run with --full-refresh.
+--
+-- Whole months because of BigQuery: there the table is partitioned by month and an
+-- incremental run replaces whole partitions (insert_overwrite), so the rows selected
+-- must cover every month they touch, or the rest of that month would be deleted.
+-- DuckDB has no partitions and replaces the selected rows by pitch_id (delete+insert).
 --
 -- Contact columns (launch speed, angle, distance, spray) describe what happened on the
 -- pitch. They are model INPUTS for a batted-ball HR model, but never inputs for a model
@@ -14,7 +19,9 @@
     config(
         materialized='incremental',
         unique_key='pitch_id',
-        incremental_strategy='delete+insert',
+        incremental_strategy='insert_overwrite' if target.type == 'bigquery' else 'delete+insert',
+        partition_by=bq_partition_by('game_date'),
+        cluster_by=bq_cluster_by(['batter_id', 'venue_id']),
         on_schema_change='fail'
     )
 }}
@@ -32,7 +39,8 @@ with pitches as (
 
     {% if is_incremental() %}
       and game_date >= (
-          select max(game_date) - interval {{ var('batted_balls_lookback_days') }} day
+          select cast({{ dbt.date_trunc('month',
+                     dbt.dateadd('day', -var('batted_balls_lookback_days'), 'max(game_date)')) }} as date)
           from {{ this }}
       )
     {% endif %}
@@ -59,7 +67,7 @@ spray as (
 
     select
         *,
-        degrees(atan2(hc_x - 125.42, 198.27 - hc_y))   as spray_angle_deg
+        {{ to_degrees('atan2(hc_x - 125.42, 198.27 - hc_y)') }}  as spray_angle_deg
     from pitches
 
 ),
@@ -154,9 +162,9 @@ select
     pa_event,
     pa_event = 'home_run'                               as is_home_run,
     pa_event = 'home_run'
-        and play_description ilike '%inside-the-park%'  as is_inside_the_park_hr,
+        and lower(play_description) like '%inside-the-park%'      as is_inside_the_park_hr,
     pa_event = 'home_run'
-        and play_description not ilike '%inside-the-park%' as is_over_fence_hr,
+        and lower(play_description) not like '%inside-the-park%'  as is_over_fence_hr,
 
     -- Savant's expected stats from launch speed and angle (benchmarks to beat)
     xba,

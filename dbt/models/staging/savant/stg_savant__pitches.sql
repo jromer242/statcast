@@ -1,6 +1,16 @@
 -- One row per pitch, cleaned and deduplicated.
 -- Staging rules: rename, cast, drop dead columns, dedupe. No joins, no business logic.
 
+-- The biggest table, so on BigQuery it's partitioned by month of game_date (queries for
+-- a date range read only those months) and clustered by game_pk (the PA and batted-ball
+-- models group by it). No-ops on DuckDB: see macros/cross_db.sql.
+{{
+    config(
+        partition_by=bq_partition_by('game_date'),
+        cluster_by=bq_cluster_by(['game_pk'])
+    )
+}}
+
 with source as (
 
     select * from {{ source('savant', 'statcast_raw') }}
@@ -24,7 +34,8 @@ renamed as (
 
     select
         -- keys
-        game_pk || '-' || at_bat_number || '-' || pitch_number as pitch_id,
+        cast(game_pk as string) || '-' || cast(at_bat_number as string)
+            || '-' || cast(pitch_number as string)  as pitch_id,
         game_pk,
         at_bat_number,
         pitch_number,

@@ -34,9 +34,9 @@ select
     -- as listed that season
     primaryPosition.abbreviation                as primary_position,
     primaryPosition.type                        as position_type,
-    -- height arrives as text like 6' 2"
-    cast(regexp_extract(height, '(\d+)''', 1) as integer) * 12
-        + cast(regexp_extract(height, '(\d+)"', 1) as integer)
+    -- height arrives as text like 6' 2": the first number is feet, the last is inches
+    cast({{ regexp_capture('height', '^([0-9]+)') }} as integer) * 12
+        + cast({{ regexp_capture('height', '([0-9]+)[^0-9]*$') }} as integer)
                                                 as height_in,
     weight                                      as weight_lb,
     -- strike zone top and bottom (feet) the API uses for this player

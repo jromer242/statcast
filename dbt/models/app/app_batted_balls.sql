@@ -13,9 +13,9 @@ select
     b.launch_speed,
     b.launch_angle,
     b.hit_distance,
-    round(b.spray_angle_deg, 1)                             as spray_angle_deg,
-    round(b.hit_distance * sin(radians(b.spray_angle_deg)), 1)  as x_ft,
-    round(b.hit_distance * cos(radians(b.spray_angle_deg)), 1)  as y_ft,
+    {{ round_decimal('b.spray_angle_deg', 1) }}                             as spray_angle_deg,
+    {{ round_decimal('b.hit_distance * sin(b.spray_angle_deg * acos(-1) / 180)', 1) }}  as x_ft,
+    {{ round_decimal('b.hit_distance * cos(b.spray_angle_deg * acos(-1) / 180)', 1) }}  as y_ft,
     b.is_home_run,
     b.is_over_fence_hr,
     b.pa_event

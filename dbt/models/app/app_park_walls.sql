@@ -26,7 +26,7 @@ parks as (
 
 angles as (
 
-    select cast(a as double) as angle_deg from range(-45, 46) t(a)
+    select cast(a as {{ type_double() }}) as angle_deg from {{ integer_series(-45, 45, 'a') }}
 
 ),
 
@@ -49,9 +49,9 @@ select
     season,
     venue_name,
     cast(angle_deg as integer)                              as angle_deg,
-    round(wall_distance_ft, 1)                              as wall_distance_ft,
-    round(wall_height_ft, 1)                                as wall_height_ft,
+    {{ round_decimal('wall_distance_ft', 1) }}                              as wall_distance_ft,
+    {{ round_decimal('wall_height_ft', 1) }}                                as wall_height_ft,
     -- negative x is left field, y points from home plate to center field
-    round(wall_distance_ft * sin(radians(angle_deg)), 1)    as x_ft,
-    round(wall_distance_ft * cos(radians(angle_deg)), 1)    as y_ft
+    {{ round_decimal('wall_distance_ft * sin(angle_deg * acos(-1) / 180)', 1) }}  as x_ft,
+    {{ round_decimal('wall_distance_ft * cos(angle_deg * acos(-1) / 180)', 1) }}  as y_ft
 from walls

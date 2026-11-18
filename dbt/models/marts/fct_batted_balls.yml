@@ -21,9 +21,15 @@ models:
     columns:
       # keys
       - name: pitch_id
-        data_type: varchar
+        data_type: string
         description: The pitch that was put in play (game_pk-at_bat_number-pitch_number). Primary key.
         constraints: [{type: primary_key}]
+        data_tests:
+          # BigQuery records primary keys but doesn't enforce them (DuckDB does), so
+          # uniqueness is tested there instead.
+          - unique:
+              config:
+                enabled: "{{ target.type == 'bigquery' }}"
       - name: game_pk
         data_type: bigint
         constraints: [{type: not_null}]
@@ -44,7 +50,7 @@ models:
         data_type: integer
         constraints: [{type: not_null}]
       - name: game_type
-        data_type: varchar
+        data_type: string
       - name: venue_id
         data_type: bigint
         description: Where the game was played (not the home team's usual park).
@@ -63,20 +69,20 @@ models:
         data_type: bigint
         constraints: [{type: not_null}]
       - name: batter_stand
-        data_type: varchar
+        data_type: string
         description: Side the batter hit from on this pitch (a switch hitter's side depends on the pitcher).
         data_tests:
           - accepted_values:
               arguments:
                 values: ['L', 'R']
       - name: pitcher_throws
-        data_type: varchar
+        data_type: string
 
       # situation before the pitch
       - name: inning
         data_type: bigint
       - name: inning_topbot
-        data_type: varchar
+        data_type: string
       - name: outs_when_up
         data_type: bigint
       - name: balls
@@ -87,38 +93,38 @@ models:
 
       # pitch
       - name: pitch_type
-        data_type: varchar
+        data_type: string
         description: Savant pitch code (FF four-seam, SL slider, CH changeup...).
       - name: release_speed
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Pitch speed out of the hand, mph.
       - name: plate_x
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Horizontal location crossing the plate, feet from the center, catcher's view.
       - name: plate_z
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Height crossing the plate, feet above the ground.
 
       # swing (bat tracking, 2023 onward)
       - name: bat_speed
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Speed of the sweet spot at contact, mph. Null when bat tracking missed the swing.
       - name: swing_length
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Distance the bat head traveled, feet.
       - name: attack_angle
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Vertical angle of the bat's path at contact, degrees.
 
       # contact
       - name: batted_ball_type
-        data_type: varchar
+        data_type: string
         data_tests:
           - accepted_values:
               arguments:
                 values: ['ground_ball', 'line_drive', 'fly_ball', 'popup']
       - name: launch_speed
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Exit velocity, mph.
       - name: launch_angle
         data_type: bigint
@@ -127,28 +133,28 @@ models:
         data_type: bigint
         description: Projected distance in feet (where it landed or would have landed).
       - name: hc_x
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Savant's hit coordinate, x (pixels on a field diagram). Input to spray_angle_deg.
       - name: hc_y
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: has_launch_data
-        data_type: boolean
+        data_type: bool
         description: False for under 1% of batted balls the tracking system missed. Exclude or impute before modeling.
       - name: has_hit_coordinates
-        data_type: boolean
+        data_type: bool
         description: False when Savant has no hit coordinates, so no spray angle or wall.
 
       # direction
       - name: spray_angle_deg
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: >
           Horizontal direction from home plate: 0 is dead center, -45 the left field line,
           +45 the right field line. Computed from Savant's hit coordinates (hc_x, hc_y).
       - name: pull_angle_deg
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: spray_angle_deg with the sign flipped for right-handed batters, so positive always means the pull side.
       - name: spray_direction
-        data_type: varchar
+        data_type: string
         description: pull, center or oppo, split at +-15 degrees of pull_angle_deg.
         data_tests:
           - accepted_values:
@@ -157,42 +163,42 @@ models:
 
       # the wall where the ball went
       - name: wall_distance_at_spray_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: >
           Distance to the wall at the ball's spray angle, linearly interpolated between
           Savant's measured line, gap and center distances. Gap angle is the
           fence_gap_angle_deg var. Null at neutral sites without measured dimensions.
       - name: wall_height_at_spray_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Wall height at the ball's spray angle, interpolated the same way.
       - name: distance_past_wall_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: hit_distance minus wall_distance_at_spray_ft. Positive means the ball would have landed beyond the wall.
 
       # labels
       - name: pa_event
-        data_type: varchar
+        data_type: string
         description: How the plate appearance ended. Same values as fct_plate_appearances.pa_event.
       - name: is_home_run
-        data_type: boolean
+        data_type: bool
         description: Any home run, including inside-the-park.
         constraints: [{type: not_null}]
       - name: is_inside_the_park_hr
-        data_type: boolean
+        data_type: bool
       - name: is_over_fence_hr
-        data_type: boolean
+        data_type: bool
         description: Home runs that cleared the wall. The label for park-fit models, since inside-the-park home runs don't depend on the walls.
 
       # Savant's expected stats from launch speed and angle (benchmarks to beat)
       - name: xba
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Expected batting average from launch speed and angle.
       - name: xslg
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: xwoba
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
 
       # lineage
       - name: _ingested_at
-        data_type: timestamp with time zone
+        data_type: "{{ 'timestamp' if target.type == 'bigquery' else 'timestamp with time zone' }}"
         description: When the pitch's raw file was written by scripts/ingest.py.

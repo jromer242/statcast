@@ -17,6 +17,14 @@ models:
     constraints:
       - type: primary_key
         columns: [venue_id, season]
+    data_tests:
+      # BigQuery records primary keys but doesn't enforce them (DuckDB does), so
+      # uniqueness is tested there instead.
+      - unique:
+          arguments:
+            column_name: "cast(venue_id as string) || '-' || cast(season as string)"
+          config:
+            enabled: "{{ target.type == 'bigquery' }}"
     columns:
       # keys
       - name: venue_id
@@ -26,80 +34,80 @@ models:
         data_type: integer
         constraints: [{type: not_null}]
       - name: venue_name
-        data_type: varchar
+        data_type: string
         constraints: [{type: not_null}]
 
       # location and orientation (Stats API)
       - name: city
-        data_type: varchar
+        data_type: string
       - name: state
-        data_type: varchar
+        data_type: string
       - name: country
-        data_type: varchar
+        data_type: string
       - name: latitude
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: longitude
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: elevation_ft
         data_type: bigint
         description: Feet above sea level. Thinner air at altitude carries fly balls farther. Null for most neutral sites.
       - name: azimuth_deg
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: >
           Compass direction from home plate toward center field (0 = north, 90 = east).
           Combine with wind direction to get wind blowing out vs in. Null for most neutral sites.
       - name: time_zone
-        data_type: varchar
+        data_type: string
         description: IANA time zone (America/New_York...). dim_games uses it for local start times.
       - name: roof_type
-        data_type: varchar
+        data_type: string
         description: Open, Retractable or Dome.
       - name: turf_type
-        data_type: varchar
+        data_type: string
         description: Grass or Artificial Turf.
 
       # measured dimensions, same season (Savant)
       - name: has_measured_dimensions
-        data_type: boolean
+        data_type: bool
         description: False for one-off neutral sites, which Savant doesn't measure.
       - name: walls_changed
-        data_type: boolean
+        data_type: bool
         description: The walls moved or changed height since last season, so prior-season park factors describe the old park.
       - name: distance_lf_line_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Measured distance to the wall down the left field line. The distance_* columns are null at neutral sites.
       - name: distance_lf_gap_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Measured distance to the left-center gap. Savant doesn't publish the angle; fct_batted_balls assumes fence_gap_angle_deg.
       - name: distance_cf_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: distance_rf_gap_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: distance_rf_line_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: distance_deepest_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: The farthest point of the wall, wherever it is.
       - name: avg_fence_distance_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: height_lf_line_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Wall height down the left field line. The height_* columns match the distance_* points.
       - name: height_lf_gap_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: height_cf_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: height_rf_gap_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: height_rf_line_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: height_highest_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: The tallest point of the wall (Fenway's Green Monster is 37 ft).
       - name: avg_fence_height_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: fair_area_sqft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Fair territory in square feet. Bigger outfields turn fly balls into outs and gap hits.
 
       # park factors from the previous season (leakage rule)
@@ -107,7 +115,7 @@ models:
         data_type: integer
         description: The season the park factor and environment columns come from. Always season - 1.
       - name: has_prior_park_factors
-        data_type: boolean
+        data_type: bool
         description: >
           False when the park had no qualifying sample last season: neutral sites, or a
           team's first season in a park (Sacramento and Steinbrenner Field in 2025).
@@ -153,14 +161,14 @@ models:
 
       # fly ball carry from the previous season (Savant), feet versus an average park
       - name: prior_extra_distance_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Extra feet a fly ball carried here last season versus an average park. The sum of the four parts below.
       - name: prior_elevation_extra_distance_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: prior_temperature_extra_distance_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: prior_roof_extra_distance_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: prior_environment_extra_distance_ft
-        data_type: double
+        data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
         description: Everything else (wind, humidity, park shape), as the residual Savant can't attribute.

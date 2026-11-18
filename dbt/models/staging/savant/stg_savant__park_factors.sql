@@ -21,9 +21,9 @@ select
     venue_name,
     cast(main_team_id as integer)               as home_team_id,
     -- seasons in the window, e.g. '2023-2025' for a 3-season window ending in 2025
-    cast(split_part(year_range, '-', 1) as integer)                     as window_first_season,
-    cast(coalesce(nullif(split_part(year_range, '-', 2), ''),
-                  split_part(year_range, '-', 1)) as integer)           as window_last_season,
+    cast({{ dbt.split_part('year_range', "'-'", 1) }} as integer)          as window_first_season,
+    cast(coalesce(nullif({{ dbt.split_part('year_range', "'-'", 2) }}, ''),
+                  {{ dbt.split_part('year_range', "'-'", 1) }}) as integer) as window_last_season,
     cast(n_pa as integer)                       as n_pa,           -- sample size: plate appearances
 
     -- indexes

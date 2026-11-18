@@ -14,3 +14,20 @@ statcast:
       type: duckdb
       path: ../ci/statcast_ci.duckdb
       threads: 4
+    # BigQuery: the same models, built in Google Cloud (see the BigQuery section of
+    # dbt/README.md). Signs in with your gcloud login (gcloud auth application-default
+    # login). The project ID comes from the environment, so it isn't committed:
+    #   export STATCAST_BQ_PROJECT=your-project-id
+    # The raw tables must be loaded first: python scripts/load_bigquery.py
+    bq:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('STATCAST_BQ_PROJECT', 'set-STATCAST_BQ_PROJECT') }}"
+      dataset: statcast
+      location: US
+      threads: 4
+      job_execution_timeout_seconds: 600
+      job_retries: 1
+      # Guardrail: any single query that would scan more than 5 GB fails instead of
+      # running. A full build scans well under that; the free tier is 1 TB a month.
+      maximum_bytes_billed: 5000000000

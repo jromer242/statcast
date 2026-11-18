@@ -26,21 +26,21 @@ factors as (
     select
         venue_id,
         season,
-        max(pf_runs)    filter (where rolling_years = 3 and bat_side = 'All')   as pf_runs_3yr,
-        max(pf_hr)      filter (where rolling_years = 3 and bat_side = 'All')   as pf_hr_3yr,
-        max(pf_hr)      filter (where rolling_years = 3 and bat_side = 'L')     as pf_hr_3yr_lhb,
-        max(pf_hr)      filter (where rolling_years = 3 and bat_side = 'R')     as pf_hr_3yr_rhb,
-        max(pf_hits)    filter (where rolling_years = 3 and bat_side = 'All')   as pf_hits_3yr,
-        max(pf_2b)      filter (where rolling_years = 3 and bat_side = 'All')   as pf_2b_3yr,
-        max(pf_3b)      filter (where rolling_years = 3 and bat_side = 'All')   as pf_3b_3yr,
-        max(pf_bb)      filter (where rolling_years = 3 and bat_side = 'All')   as pf_bb_3yr,
-        max(pf_so)      filter (where rolling_years = 3 and bat_side = 'All')   as pf_so_3yr,
-        max(pf_woba)    filter (where rolling_years = 3 and bat_side = 'All')   as pf_woba_3yr,
-        max(pf_hardhit) filter (where rolling_years = 3 and bat_side = 'All')   as pf_hardhit_3yr,
-        max(n_pa)       filter (where rolling_years = 3 and bat_side = 'All')   as pf_n_pa_3yr,
-        max(pf_runs)    filter (where rolling_years = 1 and bat_side = 'All')   as pf_runs_1yr,
-        max(pf_hr)      filter (where rolling_years = 1 and bat_side = 'All')   as pf_hr_1yr,
-        max(n_pa)       filter (where rolling_years = 1 and bat_side = 'All')   as pf_n_pa_1yr
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_runs end)        as pf_runs_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_hr end)          as pf_hr_3yr,
+        max(case when rolling_years = 3 and bat_side = 'L' then pf_hr end)            as pf_hr_3yr_lhb,
+        max(case when rolling_years = 3 and bat_side = 'R' then pf_hr end)            as pf_hr_3yr_rhb,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_hits end)        as pf_hits_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_2b end)          as pf_2b_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_3b end)          as pf_3b_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_bb end)          as pf_bb_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_so end)          as pf_so_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_woba end)        as pf_woba_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then pf_hardhit end)     as pf_hardhit_3yr,
+        max(case when rolling_years = 3 and bat_side = 'All' then n_pa end)           as pf_n_pa_3yr,
+        max(case when rolling_years = 1 and bat_side = 'All' then pf_runs end)        as pf_runs_1yr,
+        max(case when rolling_years = 1 and bat_side = 'All' then pf_hr end)          as pf_hr_1yr,
+        max(case when rolling_years = 1 and bat_side = 'All' then n_pa end)           as pf_n_pa_1yr
     from {{ ref('stg_savant__park_factors') }}
     group by venue_id, season
 

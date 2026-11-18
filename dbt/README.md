@@ -143,13 +143,143 @@ Limits: on about 40 games, the tests that count home parks (20+ games) have noth
 check, and the season-level checks on spray angle and wall distance use small samples.
 Those tests still run in full on the local build.
 
+## BigQuery
+
+The same models also build in Google BigQuery (`--target bq`), from one codebase. DuckDB
+stays the default for development and CI; BigQuery is where the warehouse-specific work
+lives: partitioning, clustering, load jobs, and row-level security.
+
+**Setup** (once). A project with billing linked (the usage here fits in the free tier:
+10 GB storage and 1 TB of queries a month), with a budget alert:
+
+```bash
+gcloud auth application-default login
+export STATCAST_BQ_PROJECT=your-project-id
+export STATCAST_BQ_FULL_ACCESS=user:you@example.com   # row-level security, below
+```
+
+**Load, build, compare.** From the repo root:
+
+```bash
+.venv/bin/python scripts/load_bigquery.py          # raw files -> statcast_raw dataset
+(cd dbt && ../.venv/bin/dbt build --target bq)     # models and tests -> statcast dataset
+.venv/bin/python scripts/compare_warehouses.py     # every model, BigQuery vs DuckDB
+```
+
+- **Extract and load** ([`scripts/load_bigquery.py`](../scripts/load_bigquery.py)) is the
+  step a tool like Fivetran does: copy the source data into the warehouse untouched, and
+  leave every transformation to dbt. It reads each raw source with the DuckDB
+  `external_location` from the dbt project itself, so BigQuery gets exactly the rows and
+  columns DuckDB sees. One catch it handles: pybaseball stores `game_date` with
+  nanosecond precision, which BigQuery's Parquet loader can't read as a time (it loads
+  the raw INT64), so those columns are cast to microseconds first.
+- **Parity** ([`scripts/compare_warehouses.py`](../scripts/compare_warehouses.py)): for
+  every model and column, the row count, non-null count and sum, computed in each
+  warehouse. All 15 models match.
+- **Guardrail:** the `bq` profile sets `maximum_bytes_billed` to 5 GB, so a runaway query
+  fails instead of running. A full build scans far less.
+
+### What differs between the warehouses
+
+Most SQL is the same in both. The rest goes through macros in
+[`macros/cross_db.sql`](macros/cross_db.sql) that `adapter.dispatch` to a DuckDB or
+BigQuery version, plus dbt's own cross-database macros (`dbt.split_part`,
+`dbt.dateadd`, `dbt.date_trunc`):
+
+| Need | DuckDB | BigQuery | Macro |
+|---|---|---|---|
+| Value on the first / last pitch of a PA | `arg_min_null`, `arg_max_null` | `min_by`, `max_by` | `first_by`, `last_by` |
+| First regex capture group | `regexp_extract(x, p, 1)` | `regexp_extract(x, p)` | `regexp_capture` |
+| UTC to a park's local time | `timezone(tz, timezone('UTC', t))` | `datetime(t, tz)` | `utc_to_local` |
+| Integers -45..45 | `range(-45, 46)` | `unnest(generate_array(-45, 45))` | `integer_series` |
+| 64-bit float type | `double` | `float64` | `type_double` |
+| Rounding shown to people | `round` scales the float first | `round` rounds the exact binary value | `round_decimal` |
+| Conditional aggregate | `count(*) filter (where c)` | not supported | written as `count(case when c then 1 end)` |
+| Quoting a reserved word | `"left"` | `` `left` `` | `adapter.quote('left')` |
+
+Three of these turned up something worth knowing:
+
+- **A bug in the DuckDB model.** `fct_plate_appearances` used `arg_min(runner_on_2b_id,
+  pitch_number)` for "runner on second at the start". DuckDB's `arg_min` skips NULLs, so
+  when second base was empty on the first pitch and a runner stole it mid-PA, it
+  returned that runner: 11,413 PAs (2%) were wrongly marked with a runner on second and
+  3,495 on third. BigQuery's `min_by` keeps the NULL, so the port would have shown it as
+  a mismatch; `first_by` now uses `arg_min_null` on DuckDB.
+- **Rounding.** 7.85 is stored in binary as 7.84999999999999964. BigQuery rounds that to
+  7.8, DuckDB to 7.9, so 36 park wall heights and a few leaderboard rates came out 0.1 or
+  0.001 apart. `round_decimal` rounds as a decimal (7.9 on both) in the app models.
+- **Ties.** The leaderboard's "main team" used `mode()`, which picks any of the tied
+  values. Two traded players had exactly as many PAs for each team, so the answer could
+  change between runs. Ties now go to the alphabetically first team.
+
+**Contracts** use type names both warehouses accept (`string`, `bool`, `int64`,
+`integer`, `date`, `datetime`). Where there's none (`double`/`float64`, and
+`timestamp with time zone`/`timestamp`), the type switches on the target:
+`data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"`.
+**Constraints** differ: BigQuery records primary keys but doesn't enforce them, so each
+mart's key gets a `unique` test enabled only on BigQuery.
+
+### Partitioning and clustering
+
+| Table | Partitioned by | Clustered by |
+|---|---|---|
+| `stg_savant__pitches` | month of `game_date` | `game_pk` |
+| `fct_plate_appearances` | month of `game_date` | `batter_id`, `pitcher_id` |
+| `fct_batted_balls` | month of `game_date` | `batter_id`, `venue_id` |
+
+Month, not day: a season has about 180 game days, so daily partitions would hold only
+~2,000 rows each, far too small to be worth it (BigQuery recommends partitions of 1 GB
+or more; past that, clustering does the pruning). A query for August 2025 on pitches
+reads 3.0 MB instead of 36.4 MB (8%). Choosing columns matters more: `select *` on
+pitches reads 1.8 GB, because BigQuery storage is columnar and bills by the columns read.
+
+`fct_batted_balls` is incremental with `insert_overwrite` on BigQuery (BigQuery has no
+`delete+insert`): each run replaces whole month partitions. That's why the incremental
+filter starts at the beginning of a month on both warehouses. Selecting only the last 7
+days would replace a month's partition with just those 7 days and delete the rest of
+it. An incremental run processes about 1 MB.
+
+### Row-level security
+
+[`macros/row_access_policies.sql`](macros/row_access_policies.sql) runs as a post-hook
+on `fct_plate_appearances` and creates two row access policies:
+
+| Policy | Granted to | Filter |
+|---|---|---|
+| `all_rows` | `STATCAST_BQ_FULL_ACCESS` (you; dbt's tests need every row) | `true` |
+| `team_hou` | `STATCAST_BQ_TEAM_ANALYST` (a demo service account) | `batting_team = 'HOU'` |
+
+Principals come from environment variables, so no email address is committed. Without
+`STATCAST_BQ_FULL_ACCESS` the hook creates nothing, because once a table has any policy,
+everyone, its owner included, sees only rows from policies they're granted.
+[`scripts/demo_row_access.py`](../scripts/demo_row_access.py) runs one query as you and
+as the analyst (by impersonating the service account):
+
+```
+fct_plate_appearances, 2026 (has row access policies)
+  you                     187,224 PAs  30 teams  5,643 HR
+  statcast-hou-analyst      6,207 PAs   1 teams    230 HR
+app_batter_seasons, 2026 (built from it, no policy of its own)
+  statcast-hou-analyst        662 batters 30 teams  <- every team
+```
+
+Two things the demo shows:
+- The hook runs on every build because `create or replace table`, how dbt rebuilds a
+  table, drops the table's policies.
+- Policies don't follow the data. `app_batter_seasons` is built from the protected
+  table, but it's a new table with no policy, so the analyst sees every team there.
+  Row-level security has to be applied to every table that exposes the rows.
+
+The demo service account has read access to the `statcast` dataset only, plus
+permission to run queries (`roles/bigquery.jobUser`).
+
 ## Where tests live
 
 | Kind | Where | What it is |
 |---|---|---|
 | Generic tests | `data_tests:` under a column in `models/**/*.yml` and `seeds/_seeds.yml` | Built-in checks (`unique`, `not_null`, `accepted_values`) applied to one column |
 | Singular tests | `tests/*.sql`, described in `tests/_tests.yml` | A custom SQL query. **Every row it returns is a failure.** |
-| Constraints | `constraints:` in `models/marts/<model>.yml` | Primary keys and `not_null`, enforced by DuckDB when the table is written (see contracts below). |
+| Constraints | `constraints:` in `models/marts/<model>.yml` | Primary keys and `not_null`, enforced by DuckDB when the table is written (see contracts below). BigQuery enforces `not_null` but not primary keys, so those get a BigQuery-only `unique` test. |
 
 Both kinds pass when the test query returns zero rows. A test configured with `severity = 'warn'`
 reports its rows as a warning instead of failing the build. On failure, dbt prints the row count;

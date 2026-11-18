@@ -55,10 +55,10 @@ select
     g.official_date,
     g.season,
     g.game_datetime_utc,
-    -- Scheduled start in the park's local time. timezone('UTC', ...) reads the stored
-    -- value as UTC, so the result doesn't depend on the machine's time zone.
-    timezone(v.time_zone, timezone('UTC', g.game_datetime_utc))     as game_datetime_local,
-    hour(timezone(v.time_zone, timezone('UTC', g.game_datetime_utc)))
+    -- Scheduled start in the park's local time. utc_to_local (macros/cross_db.sql) reads
+    -- the stored value as UTC, so the result doesn't depend on the session's time zone.
+    {{ utc_to_local('g.game_datetime_utc', 'v.time_zone') }}         as game_datetime_local,
+    extract(hour from {{ utc_to_local('g.game_datetime_utc', 'v.time_zone') }})
                                                                     as local_start_hour,
     g.day_night,
 

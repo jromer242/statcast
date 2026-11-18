@@ -86,7 +86,7 @@ models:
     data_tests:
       - unique:
           arguments:
-            column_name: "venue_id || '-' || season"
+            column_name: "cast(venue_id as string) || '-' || cast(season as string)"
     columns:
       - name: venue_id
         data_tests: [not_null]
@@ -117,7 +117,7 @@ models:
     data_tests:
       - unique:
           arguments:
-            column_name: "venue_id || '-' || season || '-' || rolling_years || '-' || bat_side"
+            column_name: "cast(venue_id as string) || '-' || cast(season as string) || '-' || cast(rolling_years as string) || '-' || cast(bat_side as string)"
     columns:
       - name: venue_id
         data_tests: [not_null]
@@ -129,6 +129,7 @@ models:
           - accepted_values:
               arguments:
                 values: [1, 3]
+                quote: false
       - name: bat_side
         description: All, L (left-handed batters) or R (right-handed batters).
         data_tests:
@@ -155,7 +156,7 @@ models:
     data_tests:
       - unique:
           arguments:
-            column_name: "venue_id || '-' || season"
+            column_name: "cast(venue_id as string) || '-' || cast(season as string)"
     columns:
       - name: venue_id
         data_tests: [not_null]

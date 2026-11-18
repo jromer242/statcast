@@ -14,30 +14,36 @@ models:
         data_type: bigint
         description: MLBAM id, the same id Statcast uses for batter_id and pitcher_id. Primary key.
         constraints: [{type: primary_key}]
+        data_tests:
+          # BigQuery records primary keys but doesn't enforce them (DuckDB does), so
+          # uniqueness is tested there instead.
+          - unique:
+              config:
+                enabled: "{{ target.type == 'bigquery' }}"
       - name: full_name
-        data_type: varchar
+        data_type: string
         constraints: [{type: not_null}]
       - name: first_name
-        data_type: varchar
+        data_type: string
       - name: last_name
-        data_type: varchar
+        data_type: string
       - name: use_first_name
-        data_type: varchar
+        data_type: string
         description: The first name used day to day (Mike for Michael).
       - name: boxscore_name
-        data_type: varchar
+        data_type: string
         description: Short name as printed in box scores (Judge, A).
       - name: birth_date
         data_type: date
       - name: birth_country
-        data_type: varchar
+        data_type: string
       - name: mlb_debut_date
         data_type: date
       - name: draft_year
         data_type: bigint
         description: Null for players who signed as international free agents.
       - name: bats
-        data_type: varchar
+        data_type: string
         description: L, R or S (switch hitter). The side for a given PA is fct_plate_appearances.batter_stand.
         constraints: [{type: not_null}]
         data_tests:
@@ -45,7 +51,7 @@ models:
               arguments:
                 values: ['L', 'R', 'S']
       - name: throws
-        data_type: varchar
+        data_type: string
         description: >
           L or R, or S for the rare ambidextrous thrower (Carlos Cortes, Anthony Seigler
           in 2025-26). The arm on a given pitch is fct_plate_appearances.pitcher_throws.
@@ -55,10 +61,10 @@ models:
               arguments:
                 values: ['L', 'R', 'S']
       - name: primary_position
-        data_type: varchar
+        data_type: string
         description: Listed position in the latest season (P, C, 1B, ..., DH, TWP for two-way players).
       - name: position_type
-        data_type: varchar
+        data_type: string
         description: Pitcher, Catcher, Infielder, Outfielder, Hitter or Two-Way Player.
       - name: height_in
         data_type: integer

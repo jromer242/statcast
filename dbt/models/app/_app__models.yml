@@ -7,7 +7,7 @@ models:
     data_tests:
       - unique:
           arguments:
-            column_name: "venue_id || '-' || season || '-' || angle_deg"
+            column_name: "cast(venue_id as string) || '-' || cast(season as string) || '-' || cast(angle_deg as string)"
     columns:
       - name: angle_deg
         description: Spray angle in whole degrees; negative is left field.
@@ -34,7 +34,7 @@ models:
     data_tests:
       - unique:
           arguments:
-            column_name: "batter_id || '-' || season"
+            column_name: "cast(batter_id as string) || '-' || cast(season as string)"
     columns:
       - name: team
         description: The team with most of the batter's PAs that season.

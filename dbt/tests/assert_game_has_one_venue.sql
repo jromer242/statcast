@@ -9,7 +9,7 @@
 select
     gamePk                                  as game_pk,
     count(distinct venue.id)                as venues,
-    list(distinct venue.name)               as venue_names
+    string_agg(distinct venue.name, ', ')   as venue_names
 from {{ source('mlb', 'schedule_raw') }}
 where status.detailedState not in ('Postponed', 'Cancelled')
 group by gamePk

@@ -22,16 +22,16 @@ select
     cast(elevation_feet as integer)                 as elevation_ft,
 
     -- conditions over the season
-    cast(avg_roof as double)                        as pct_games_roof_closed,
-    cast(avg_daytime as double)                     as pct_games_daytime,
-    cast(avg_temperature as double)                 as avg_temperature_f,
+    cast(avg_roof as {{ type_double() }})                        as pct_games_roof_closed,
+    cast(avg_daytime as {{ type_double() }})                     as pct_games_daytime,
+    cast(avg_temperature as {{ type_double() }})                 as avg_temperature_f,
 
     -- extra carry in feet; the four parts add up to the total
-    cast(extra_distance as double)                  as extra_distance_ft,
-    cast(elevation_extra_distance as double)        as elevation_extra_distance_ft,
-    cast(temperature_extra_distance as double)      as temperature_extra_distance_ft,
-    cast(roof_extra_distance as double)             as roof_extra_distance_ft,
-    cast(environment_extra_distance as double)      as environment_extra_distance_ft,
+    cast(extra_distance as {{ type_double() }})                  as extra_distance_ft,
+    cast(elevation_extra_distance as {{ type_double() }})        as elevation_extra_distance_ft,
+    cast(temperature_extra_distance as {{ type_double() }})      as temperature_extra_distance_ft,
+    cast(roof_extra_distance as {{ type_double() }})             as roof_extra_distance_ft,
+    cast(environment_extra_distance as {{ type_double() }})      as environment_extra_distance_ft,
 
     -- lineage
     filename                                        as _source_file,

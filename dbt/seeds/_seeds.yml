@@ -5,10 +5,10 @@ seeds:
       from https://baseballsavant.mlb.com/csv-docs. Don't edit by hand; re-run the script.
     config:
       column_types:
-        field: varchar
-        stg_column: varchar
-        description: varchar
-        source: varchar
+        field: string
+        stg_column: string
+        description: string
+        source: string
     columns:
       - name: field
         description: Raw Savant column name.

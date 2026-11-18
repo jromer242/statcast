@@ -6,7 +6,9 @@
 A local data pipeline for MLB pitch-level data, built as the foundation for home run
 prediction models. It pulls Statcast pitches, the MLB schedule, venue details and park
 dimensions from public sources, then uses dbt to turn them into clean, tested
-DuckDB tables, and serves them in a Streamlit app.
+tables, and serves them in a Streamlit app. The same dbt models build in DuckDB (local
+and CI) and in Google BigQuery, with partitioning, clustering and row-level security
+there.
 
 **Status:** ingestion, staging and the marts are done for 2024–2026 (2.3M pitches,
 560k plate appearances, 380k batted balls, 7,420 games, park data back to 2015). The
@@ -99,7 +101,7 @@ flowchart LR
 
 ## Stack
 
-Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-duckdb · Streamlit and Altair · scikit-learn and XGBoost · GitHub Actions
+Python (pandas, requests, pybaseball) · DuckDB · Google BigQuery · Parquet · dbt-core with dbt-duckdb and dbt-bigquery · Streamlit and Altair · scikit-learn and XGBoost · GitHub Actions
 
 ## Problems worth reading about
 
@@ -145,6 +147,12 @@ Python (pandas, requests, pybaseball) · DuckDB · Parquet · dbt-core with dbt-
   `truncated_pa` or with no event at all (about 1,300 on 2024–26). Counting them would
   inflate PAs and deflate every rate stat, so `fct_plate_appearances` flags them
   `is_completed_pa = false`, and a test checks that each one really ended its half-inning.
+- **Porting to BigQuery found a bug.** DuckDB's `arg_min` skips NULLs, so "runner on
+  second at the start of the PA" picked up runners who stole second during it: 2% of
+  plate appearances were wrong. BigQuery's `min_by` keeps the NULL, and a model-by-model
+  comparison of the two warehouses showed the gap. It also turned up a rounding
+  difference (7.85 is 7.8499999... in binary) and a nondeterministic `mode()`. See the
+  BigQuery section of [dbt/README.md](dbt/README.md).
 - **Tests that are proven to fail.** Each cross-source test was broken on purpose
   (by removing a season's file) to confirm it catches the problem.
 
@@ -172,13 +180,18 @@ cd dbt && ../.venv/bin/dbt build && cd ..
 .venv/bin/python scripts/export_app_data.py
 ```
 
+To build in BigQuery instead, see the BigQuery section of
+[dbt/README.md](dbt/README.md): `scripts/load_bigquery.py` loads the raw files, then
+`dbt build --target bq`.
+
 The database is created at `data/statcast.duckdb`. Raw data and the database are not
 committed; a full season of Statcast is about 105 MB of Parquet.
 
 ## Repository layout
 
 ```
-scripts/      ingest scripts, one per source (shared helpers in common.py)
+scripts/      ingest scripts, one per source (shared helpers in common.py), and the
+              BigQuery load, comparison and row-level security demo
 dbt/          dbt project: sources, staging models, tests, data dictionary seed
 ci/fixtures/  small committed sample of the raw files that CI builds from
 app/          Streamlit app; app/data/ holds the Parquet extracts it reads
@@ -197,6 +210,7 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] CI: dbt build and test on every push and pull request
 - [x] Streamlit app: spray charts on any park's walls, and leaderboards
 - [x] Deploy the app on Streamlit Community Cloud
+- [x] Build on BigQuery too: partitioning, clustering, row-level security
 - [ ] Scheduled daily runs
 - [x] Batted-ball park-fit model (notebook 07)
 - [ ] Season home run projections and milestone backtest (notebook 08)

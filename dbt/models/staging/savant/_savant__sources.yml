@@ -1,6 +1,10 @@
 sources:
   - name: savant
     description: Raw Baseball Savant Statcast pulls, written as Parquet by scripts/ingest.py.
+    # On BigQuery (--target bq) the raw files are loaded into the statcast_raw dataset by
+    # scripts/load_bigquery.py, and this schema points there. On DuckDB it's unused: each
+    # table's external_location reads the files directly.
+    schema: statcast_raw
     tables:
       - name: statcast_raw
         description: >
