@@ -18,10 +18,85 @@ models:
     config:
       contract:
         enforced: true
+    # Semantic layer: contact quality and how far home runs carried. Includes the
+    # postseason unless filtered on season_phase. Launch metrics only use balls with both
+    # exit velocity and launch angle (has_launch_data); a few hundred have just one, and
+    # counting them in a rate's numerator but not its denominator would skew it.
+    semantic_model: true
+    agg_time_dimension: game_date
+    derived_semantics:
+      entities:
+        - name: venue_season
+          type: foreign
+          expr: "cast(venue_id as string) || '-' || cast(season as string)"
+      dimensions:
+        - name: season_phase
+          type: categorical
+          description: regular or postseason. Filter on regular for official season totals.
+          expr: "case when game_type = 'R' then 'regular' else 'postseason' end"
+    metrics:
+      - name: batted_balls
+        label: Batted balls (BBE)
+        description: Balls in play with Statcast launch data (exit velocity and launch angle).
+        agg: sum
+        expr: case when has_launch_data then 1 else 0 end
+      - name: avg_exit_velocity
+        label: Average exit velocity (mph)
+        agg: average
+        expr: case when has_launch_data then launch_speed end
+      - name: max_exit_velocity
+        label: Max exit velocity (mph)
+        agg: max
+        expr: case when has_launch_data then launch_speed end
+      - name: avg_launch_angle
+        label: Average launch angle (degrees)
+        agg: average
+        expr: case when has_launch_data then launch_angle end
+      - name: avg_bat_speed
+        label: Average bat speed (mph)
+        description: Bat tracking, on swings Statcast measured. Savant's leaderboards use only the fastest 90% of swings, so this runs lower.
+        agg: average
+        expr: bat_speed
+      - name: hard_hit_balls
+        hidden: true
+        agg: sum
+        expr: case when has_launch_data and launch_speed >= 95 then 1 else 0 end
+      - name: hard_hit_rate
+        label: Hard-hit rate
+        description: Share of batted balls hit 95 mph or harder.
+        type: ratio
+        numerator: hard_hit_balls
+        denominator: batted_balls
+      - name: sweet_spot_balls
+        hidden: true
+        agg: sum
+        expr: case when has_launch_data and launch_angle between 8 and 32 then 1 else 0 end
+      - name: sweet_spot_rate
+        label: Sweet-spot rate
+        description: Share of batted balls with a launch angle from 8 to 32 degrees.
+        type: ratio
+        numerator: sweet_spot_balls
+        denominator: batted_balls
+      - name: avg_home_run_distance
+        label: Average home run distance (ft)
+        description: Projected distance of home runs (Statcast hit_distance), inside-the-park included.
+        agg: average
+        expr: case when is_home_run then hit_distance end
+      - name: avg_home_run_clearance
+        label: Average home run clearance (ft)
+        description: >
+          How far past the wall home runs over the fence went: distance minus the wall
+          distance at that spray angle. Small values are wall-scrapers that wouldn't be
+          out in a bigger park. Null where the park has no measured walls.
+        agg: average
+        expr: case when is_over_fence_hr then distance_past_wall_ft end
     columns:
       # keys
       - name: pitch_id
         data_type: string
+        entity:
+          name: batted_ball
+          type: primary
         description: The pitch that was put in play (game_pk-at_bat_number-pitch_number). Primary key.
         constraints: [{type: primary_key}]
         data_tests:
@@ -32,6 +107,9 @@ models:
                 enabled: "{{ target.type == 'bigquery' }}"
       - name: game_pk
         data_type: bigint
+        entity:
+          name: game
+          type: foreign
         constraints: [{type: not_null}]
         data_tests:
           - relationships:
@@ -46,11 +124,17 @@ models:
         description: Pitch of the at-bat (1 = first).
       - name: game_date
         data_type: date
+        granularity: day
+        # The long form: the shorthand `dimension: time` loses the granularity in dbt 1.12.
+        dimension:
+          type: time
       - name: season
         data_type: integer
+        dimension: categorical
         constraints: [{type: not_null}]
       - name: game_type
         data_type: string
+        dimension: categorical
       - name: venue_id
         data_type: bigint
         description: Where the game was played (not the home team's usual park).
@@ -59,6 +143,9 @@ models:
       # players
       - name: batter_id
         data_type: bigint
+        entity:
+          name: batter
+          type: foreign
         constraints: [{type: not_null}]
         data_tests:
           - relationships:
@@ -67,9 +154,13 @@ models:
                 field: player_id
       - name: pitcher_id
         data_type: bigint
+        entity:
+          name: pitcher
+          type: foreign
         constraints: [{type: not_null}]
       - name: batter_stand
         data_type: string
+        dimension: categorical
         description: Side the batter hit from on this pitch (a switch hitter's side depends on the pitcher).
         data_tests:
           - accepted_values:
@@ -77,6 +168,7 @@ models:
                 values: ['L', 'R']
       - name: pitcher_throws
         data_type: string
+        dimension: categorical
 
       # situation before the pitch
       - name: inning
@@ -94,6 +186,7 @@ models:
       # pitch
       - name: pitch_type
         data_type: string
+        dimension: categorical
         description: Savant pitch code (FF four-seam, SL slider, CH changeup...).
       - name: release_speed
         data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
@@ -119,6 +212,7 @@ models:
       # contact
       - name: batted_ball_type
         data_type: string
+        dimension: categorical
         data_tests:
           - accepted_values:
               arguments:
@@ -155,6 +249,7 @@ models:
         description: spray_angle_deg with the sign flipped for right-handed batters, so positive always means the pull side.
       - name: spray_direction
         data_type: string
+        dimension: categorical
         description: pull, center or oppo, split at +-15 degrees of pull_angle_deg.
         data_tests:
           - accepted_values:
@@ -181,12 +276,14 @@ models:
         description: How the plate appearance ended. Same values as fct_plate_appearances.pa_event.
       - name: is_home_run
         data_type: bool
+        dimension: categorical
         description: Any home run, including inside-the-park.
         constraints: [{type: not_null}]
       - name: is_inside_the_park_hr
         data_type: bool
       - name: is_over_fence_hr
         data_type: bool
+        dimension: categorical
         description: Home runs that cleared the wall. The label for park-fit models, since inside-the-park home runs don't depend on the walls.
 
       # Savant's expected stats from launch speed and angle (benchmarks to beat)

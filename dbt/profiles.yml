@@ -1,7 +1,9 @@
 # dbt looks for profiles.yml in the current directory first, so running dbt from
 # this folder uses this file instead of ~/.dbt/profiles.yml.
 statcast:
-  target: dev
+  # DBT_TARGET picks the target like --target does. MetricFlow's `mf` has no --target,
+  # and only reads this default, so `DBT_TARGET=bq mf query ...` queries BigQuery.
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
   outputs:
     dev:
       type: duckdb

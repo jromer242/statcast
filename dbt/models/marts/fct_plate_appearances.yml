@@ -18,10 +18,172 @@ models:
     config:
       contract:
         enforced: true
+    # Semantic layer: counting stats and rate stats per plate appearance. Every metric
+    # includes the postseason unless filtered on season_phase. Counting metrics skip
+    # truncated PAs (the inning ended mid-PA); see is_completed_pa.
+    semantic_model: true
+    agg_time_dimension: game_date
+    derived_semantics:
+      entities:
+        - name: venue_season
+          type: foreign
+          expr: "cast(venue_id as string) || '-' || cast(season as string)"
+      dimensions:
+        - name: season_phase
+          type: categorical
+          description: regular or postseason. Filter on regular for official season totals.
+          expr: "case when game_type = 'R' then 'regular' else 'postseason' end"
+    metrics:
+      # counting stats
+      - name: plate_appearances
+        label: Plate appearances (PA)
+        description: Completed plate appearances. Truncated PAs (the inning ended while the batter was up) don't count.
+        agg: sum
+        expr: case when is_completed_pa then 1 else 0 end
+      - name: at_bats
+        label: At bats (AB)
+        description: Official at bats. Excludes walks, hit by pitch, sacrifices and catcher interference.
+        agg: sum
+        expr: case when is_at_bat then 1 else 0 end
+      - name: hits
+        label: Hits (H)
+        agg: sum
+        expr: case when is_hit then 1 else 0 end
+      - name: doubles
+        label: Doubles (2B)
+        agg: sum
+        expr: case when pa_event = 'double' then 1 else 0 end
+      - name: triples
+        label: Triples (3B)
+        agg: sum
+        expr: case when pa_event = 'triple' then 1 else 0 end
+      - name: home_runs
+        label: Home runs (HR)
+        description: Home runs, inside-the-park included.
+        agg: sum
+        expr: case when is_home_run then 1 else 0 end
+      - name: walks
+        label: Walks (BB)
+        description: Walks, intentional walks included.
+        agg: sum
+        expr: case when is_walk then 1 else 0 end
+      - name: strikeouts
+        label: Strikeouts (K)
+        agg: sum
+        expr: case when is_strikeout then 1 else 0 end
+      - name: hit_by_pitch
+        label: Hit by pitch (HBP)
+        agg: sum
+        expr: case when is_hit_by_pitch then 1 else 0 end
+      - name: sacrifice_flies
+        label: Sacrifice flies (SF)
+        agg: sum
+        expr: case when pa_event in ('sac_fly', 'sac_fly_double_play') then 1 else 0 end
+      - name: total_bases
+        label: Total bases (TB)
+        description: 1 per single, 2 per double, 3 per triple, 4 per home run.
+        agg: sum
+        expr: total_bases
+      - name: run_value
+        label: Run value
+        description: >
+          Runs added by the batter over average, from the change in run expectancy over
+          each PA. From the pitcher's side, lower is better.
+        agg: sum
+        expr: run_value
+
+      # parts of rate stats, hidden from lists of metrics
+      - name: times_on_base
+        hidden: true
+        description: Hits + walks + hit by pitch, the numerator of OBP.
+        agg: sum
+        expr: case when is_hit or is_walk or is_hit_by_pitch then 1 else 0 end
+      - name: obp_denominator
+        hidden: true
+        description: At bats + walks + hit by pitch + sacrifice flies.
+        agg: sum
+        expr: "case when is_at_bat or is_walk or is_hit_by_pitch or pa_event in ('sac_fly', 'sac_fly_double_play') then 1 else 0 end"
+      - name: woba_points
+        hidden: true
+        agg: sum
+        expr: woba_value
+      - name: woba_plate_appearances
+        hidden: true
+        agg: sum
+        expr: woba_denom
+
+      # rate stats. Ratios of sums, so they stay right when rolled up to a team or a
+      # season (averaging players' averages wouldn't).
+      - name: batting_average
+        label: Batting average (AVG)
+        description: Hits per at bat.
+        type: ratio
+        numerator: hits
+        denominator: at_bats
+      - name: on_base_percentage
+        label: On-base percentage (OBP)
+        description: (H + BB + HBP) / (AB + BB + HBP + SF), the official formula.
+        type: ratio
+        numerator: times_on_base
+        denominator: obp_denominator
+      - name: slugging_percentage
+        label: Slugging percentage (SLG)
+        description: Total bases per at bat.
+        type: ratio
+        numerator: total_bases
+        denominator: at_bats
+      - name: ops
+        label: On-base plus slugging (OPS)
+        type: derived
+        expr: on_base_percentage + slugging_percentage
+        input_metrics:
+          - name: on_base_percentage
+          - name: slugging_percentage
+      - name: isolated_power
+        label: Isolated power (ISO)
+        description: SLG minus AVG, extra bases per at bat.
+        type: derived
+        expr: slugging_percentage - batting_average
+        input_metrics:
+          - name: slugging_percentage
+          - name: batting_average
+      - name: woba
+        label: Weighted on-base average (wOBA)
+        description: >
+          Savant's wOBA. It uses rounded weights and counts reaching on an error like a
+          single, so it runs about .010 above FanGraphs' wOBA.
+        type: ratio
+        numerator: woba_points
+        denominator: woba_plate_appearances
+      - name: home_run_rate
+        label: Home runs per PA (HR%)
+        type: ratio
+        numerator: home_runs
+        denominator: plate_appearances
+      - name: strikeout_rate
+        label: Strikeout rate (K%)
+        description: Strikeouts per plate appearance.
+        type: ratio
+        numerator: strikeouts
+        denominator: plate_appearances
+      - name: walk_rate
+        label: Walk rate (BB%)
+        description: Walks per plate appearance, intentional walks included.
+        type: ratio
+        numerator: walks
+        denominator: plate_appearances
+      - name: at_bats_per_home_run
+        label: At bats per home run (AB/HR)
+        type: ratio
+        numerator: at_bats
+        denominator: home_runs
     columns:
       # keys
       - name: pa_id
         data_type: string
+        entity:
+          name: plate_appearance
+          type: primary
         description: game_pk-at_bat_number. Primary key.
         constraints: [{type: primary_key}]
         data_tests:
@@ -32,6 +194,9 @@ models:
                 enabled: "{{ target.type == 'bigquery' }}"
       - name: game_pk
         data_type: bigint
+        entity:
+          name: game
+          type: foreign
         constraints: [{type: not_null}]
         data_tests:
           - relationships:
@@ -47,6 +212,9 @@ models:
         constraints: [{type: not_null}]
       - name: batter_id
         data_type: bigint
+        entity:
+          name: batter
+          type: foreign
         constraints: [{type: not_null}]
         data_tests:
           - relationships:
@@ -55,6 +223,9 @@ models:
                 field: player_id
       - name: pitcher_id
         data_type: bigint
+        entity:
+          name: pitcher
+          type: foreign
         description: Pitcher on the last pitch of the PA.
         constraints: [{type: not_null}]
         data_tests:
@@ -66,11 +237,17 @@ models:
       # game
       - name: game_date
         data_type: date
+        granularity: day
+        # The long form: the shorthand `dimension: time` loses the granularity in dbt 1.12.
+        dimension:
+          type: time
       - name: season
         data_type: integer
+        dimension: categorical
         constraints: [{type: not_null}]
       - name: game_type
         data_type: string
+        dimension: categorical
       - name: home_team
         data_type: string
         description: Statcast team abbreviation (NYY, LAD...). Same as dim_games.home_team_abbrev.
@@ -78,18 +255,23 @@ models:
         data_type: string
       - name: batting_team
         data_type: string
+        dimension: categorical
         description: The batter's team (away team in the top of the inning).
       - name: fielding_team
         data_type: string
+        dimension: categorical
 
       # situation at the start (known before the PA)
       - name: inning
         data_type: bigint
+        dimension: categorical
       - name: inning_topbot
         data_type: string
+        dimension: categorical
         description: Top or Bot.
       - name: outs_at_start
         data_type: bigint
+        dimension: categorical
         data_tests:
           - accepted_values:
               arguments:
@@ -106,14 +288,18 @@ models:
         description: Batting team's runs minus the fielding team's, before the first pitch.
       - name: pitcher_times_through_order
         data_type: bigint
+        dimension: categorical
         description: 1 the first time the pitcher faces the lineup, 2 the second... Hitters do better each time through.
       - name: batter_stand
         data_type: string
+        dimension: categorical
         description: Side the batter hit from (a switch hitter's side depends on the pitcher).
       - name: pitcher_throws
         data_type: string
+        dimension: categorical
       - name: is_same_handed
         data_type: bool
+        dimension: categorical
         description: Batter and pitcher on the same side (righty vs righty, lefty vs lefty), which favors the pitcher.
       - name: pitchers_in_pa
         data_type: bigint
@@ -122,6 +308,7 @@ models:
       # result (outcomes: never inputs for predicting this PA)
       - name: pa_event
         data_type: string
+        dimension: categorical
         description: >
           How the PA ended (single, strikeout, walk, field_out...), or truncated_pa when
           the inning ended first. The list is fixed so a new Savant event fails the build
@@ -141,6 +328,7 @@ models:
                 ]
       - name: is_completed_pa
         data_type: bool
+        dimension: categorical
         description: False when the inning ended during the PA. Counts as a PA in official stats only when true.
         constraints: [{type: not_null}]
       - name: pitches
@@ -172,6 +360,9 @@ models:
         description: 1 single, 2 double, 3 triple, 4 home run, else 0. Sum over at bats for slugging.
       - name: batted_ball_pitch_id
         data_type: string
+        entity:
+          name: batted_ball
+          type: foreign
         description: The ball in play that ended the PA, if any. Join to fct_batted_balls for launch and wall data.
         data_tests:
           - unique

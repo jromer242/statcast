@@ -45,6 +45,10 @@ models:
     marts:
       # Marts are the tables analyses and models read from.
       +materialized: table
+    semantic:
+      # The time spine MetricFlow needs. Semantic models and metrics are defined in
+      # each mart's YAML, next to its columns.
+      +materialized: table
     app:
       # Small extracts for the Streamlit app, exported to app/data/ as Parquet.
       +materialized: table

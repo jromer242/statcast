@@ -25,6 +25,15 @@ models:
             column_name: "cast(venue_id as string) || '-' || cast(season as string)"
           config:
             enabled: "{{ target.type == 'bigquery' }}"
+    # Semantic layer: the park as it was that season. Its key is two columns, and an
+    # entity is one expression, so venue_season is built the same way here and in the
+    # fact tables. Group by venue_season__venue_name, venue_season__roof_type...
+    semantic_model: true
+    derived_semantics:
+      entities:
+        - name: venue_season
+          type: primary
+          expr: "cast(venue_id as string) || '-' || cast(season as string)"
     columns:
       # keys
       - name: venue_id
@@ -35,11 +44,13 @@ models:
         constraints: [{type: not_null}]
       - name: venue_name
         data_type: string
+        dimension: categorical
         constraints: [{type: not_null}]
 
       # location and orientation (Stats API)
       - name: city
         data_type: string
+        dimension: categorical
       - name: state
         data_type: string
       - name: country
@@ -50,6 +61,7 @@ models:
         data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
       - name: elevation_ft
         data_type: bigint
+        dimension: categorical
         description: Feet above sea level. Thinner air at altitude carries fly balls farther. Null for most neutral sites.
       - name: azimuth_deg
         data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
@@ -61,9 +73,11 @@ models:
         description: IANA time zone (America/New_York...). dim_games uses it for local start times.
       - name: roof_type
         data_type: string
+        dimension: categorical
         description: Open, Retractable or Dome.
       - name: turf_type
         data_type: string
+        dimension: categorical
         description: Grass or Artificial Turf.
 
       # measured dimensions, same season (Savant)
@@ -72,6 +86,7 @@ models:
         description: False for one-off neutral sites, which Savant doesn't measure.
       - name: walls_changed
         data_type: bool
+        dimension: categorical
         description: The walls moved or changed height since last season, so prior-season park factors describe the old park.
       - name: distance_lf_line_ft
         data_type: "{{ 'float64' if target.type == 'bigquery' else 'double' }}"
@@ -116,6 +131,7 @@ models:
         description: The season the park factor and environment columns come from. Always season - 1.
       - name: has_prior_park_factors
         data_type: bool
+        dimension: categorical
         description: >
           False when the park had no qualifying sample last season: neutral sites, or a
           team's first season in a park (Sacramento and Steinbrenner Field in 2025).
@@ -126,6 +142,7 @@ models:
           column is an index where 100 = league average and 110 = 10% above.
       - name: prior_pf_hr_3yr
         data_type: integer
+        dimension: categorical
         description: Home run index over the three seasons before this one, all batters.
       - name: prior_pf_hr_3yr_lhb
         data_type: integer

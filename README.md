@@ -8,7 +8,8 @@ prediction models. It pulls Statcast pitches, the MLB schedule, venue details an
 dimensions from public sources, then uses dbt to turn them into clean, tested
 tables, and serves them in a Streamlit app. The same dbt models build in DuckDB (local
 and CI) and in Google BigQuery, with partitioning, clustering and row-level security
-there.
+there. A MetricFlow semantic layer defines the baseball stats (HR, OPS, wOBA, exit
+velocity...) once, so every query computes them the same way.
 
 **Status:** ingestion, staging and the marts are done for 2024–2026 (2.3M pitches,
 560k plate appearances, 380k batted balls, 7,420 games, park data back to 2015). The
@@ -101,7 +102,7 @@ flowchart LR
 
 ## Stack
 
-Python (pandas, requests, pybaseball) · DuckDB · Google BigQuery · Parquet · dbt-core with dbt-duckdb and dbt-bigquery · Streamlit and Altair · scikit-learn and XGBoost · GitHub Actions
+Python (pandas, requests, pybaseball) · DuckDB · Google BigQuery · Parquet · dbt-core with dbt-duckdb and dbt-bigquery · MetricFlow (dbt Semantic Layer) · Streamlit and Altair · scikit-learn and XGBoost · GitHub Actions
 
 ## Problems worth reading about
 
@@ -180,6 +181,13 @@ cd dbt && ../.venv/bin/dbt build && cd ..
 .venv/bin/python scripts/export_app_data.py
 ```
 
+Query the metrics with MetricFlow (see the Semantic layer section of
+[dbt/README.md](dbt/README.md)):
+
+```bash
+cd dbt && ../.venv/bin/mf query --metrics home_runs,ops --group-by batter__full_name --order -home_runs --limit 10
+```
+
 To build in BigQuery instead, see the BigQuery section of
 [dbt/README.md](dbt/README.md): `scripts/load_bigquery.py` loads the raw files, then
 `dbt build --target bq`.
@@ -191,8 +199,9 @@ committed; a full season of Statcast is about 105 MB of Parquet.
 
 ```
 scripts/      ingest scripts, one per source (shared helpers in common.py), and the
-              BigQuery load, comparison and row-level security demo
-dbt/          dbt project: sources, staging models, tests, data dictionary seed
+              BigQuery load, comparison and row-level security demo, and the metric check
+dbt/          dbt project: sources, staging models, marts with their semantic models and
+              metrics, tests, data dictionary seed
 ci/fixtures/  small committed sample of the raw files that CI builds from
 app/          Streamlit app; app/data/ holds the Parquet extracts it reads
 data/         raw files and the DuckDB database (git-ignored)
@@ -211,6 +220,8 @@ data/         raw files and the DuckDB database (git-ignored)
 - [x] Streamlit app: spray charts on any park's walls, and leaderboards
 - [x] Deploy the app on Streamlit Community Cloud
 - [x] Build on BigQuery too: partitioning, clustering, row-level security
+- [x] Semantic layer: 32 metrics in MetricFlow, checked against hand-written SQL
+- [ ] Claude agent that answers questions through the metrics, with evals
 - [ ] Scheduled daily runs
 - [x] Batted-ball park-fit model (notebook 07)
 - [ ] Season home run projections and milestone backtest (notebook 08)

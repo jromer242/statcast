@@ -273,6 +273,84 @@ Two things the demo shows:
 The demo service account has read access to the `statcast` dataset only, plus
 permission to run queries (`roles/bigquery.jobUser`).
 
+## Semantic layer
+
+Metrics are defined once, in dbt, with [MetricFlow](https://github.com/dbt-labs/metricflow)
+(the open-source engine behind the dbt Semantic Layer, Apache 2.0). Ask for
+`home_runs` or `ops` by any dimension and MetricFlow writes the SQL: the joins, the
+filters and the ratio math. Every tool and person asking gets the same answer. The
+metric names and descriptions are also the context an AI agent reads to answer
+questions about the data.
+
+```bash
+cd dbt
+../.venv/bin/mf list metrics
+../.venv/bin/mf query --metrics home_runs,ops --group-by batter__full_name \
+  --where "{{ Dimension('plate_appearance__season') }} = 2025" \
+  --where "{{ Dimension('plate_appearance__season_phase') }} = 'regular'" \
+  --order -home_runs --limit 5
+../.venv/bin/mf query --metrics home_run_rate --group-by venue_season__roof_type --explain   # show the SQL
+DBT_TARGET=bq ../.venv/bin/mf query ...   # the same metrics on BigQuery (after dbt parse --target bq)
+```
+
+**Where it lives.** The semantic models are in each mart's own YAML (the dbt 1.12 "v2"
+spec): `semantic_model: true` on the model, `entity:` and `dimension:` on its columns,
+and `metrics:` on the model. A column's description is its dimension's description,
+so there's one place to document it. The only new model is `metricflow_time_spine`
+(`models/semantic/`), one row per day, which MetricFlow uses to roll days up to
+months and years.
+
+**Entities** are how MetricFlow joins:
+
+| Entity | Primary key in | Used by |
+|---|---|---|
+| `plate_appearance` | `fct_plate_appearances` | |
+| `batted_ball` | `fct_batted_balls` | plate appearances (the ball that ended the PA) |
+| `game` | `dim_games` | both facts |
+| `batter`, `pitcher` | `dim_players` (unique entities on `player_id`) | both facts |
+| `venue_season` | `dim_venue_seasons` | both facts |
+
+Two of them are worth explaining. A player is both a batter and a pitcher, but a
+semantic model has one primary entity. So `dim_players` also declares `batter` and
+`pitcher` as unique entities on the same key, and you group by `batter__full_name` or
+`pitcher__full_name`. `dim_venue_seasons` has a two-column key, and an entity is one
+expression, so `venue_season` is `venue_id || '-' || season`, built the same way in
+the facts.
+
+**Metrics** (32, plus 6 hidden building blocks):
+
+| From | Metrics |
+|---|---|
+| `fct_plate_appearances` | PA, AB, H, 2B, 3B, HR, BB, K, HBP, SF, total bases, run value; AVG, OBP, SLG, OPS, ISO, wOBA, HR%, K%, BB%, AB/HR |
+| `fct_batted_balls` | batted balls, average and max exit velocity, average launch angle and bat speed, hard-hit and sweet-spot rates, average home run distance and clearance |
+| `dim_games` | games |
+
+Rates are ratio metrics (sum of hits over sum of at bats), never averages of averages,
+so they stay correct rolled up to a team, a month or a career. OPS and ISO are derived
+from other metrics. **Every metric includes the postseason** unless you filter
+`season_phase = 'regular'`; season totals that match Baseball Reference need that
+filter.
+
+**Checks.** `mf validate-configs` (in CI) checks the definitions against each other and
+runs each one against the tables. [`scripts/check_metrics.py`](../scripts/check_metrics.py)
+checks what they mean. It queries every public metric by team, season and phase and
+compares it with SQL written by hand straight from `pa_event`, not the flags the metrics
+use. All match, in DuckDB and with `--target bq` in BigQuery. Spot checks against
+official 2025 lines also match: Judge .331/.457/.688, Raleigh 60 HR, Crochet 255 K.
+
+Things that came up building it:
+- **Launch data comes in halves.** 221 batted balls have a launch angle but no exit
+  velocity, and 2 the reverse. A sweet-spot rate that counts them on top and not on the
+  bottom is wrong, so every launch metric uses only balls with both (`has_launch_data`).
+- **The dbt 1.12 shorthand `dimension: time` drops the column's granularity**, and
+  MetricFlow then rejects the time dimension. The long form (`dimension: {type: time}`)
+  works.
+- **`mf` has no `--target`.** `profiles.yml` takes its default target from
+  `DBT_TARGET`, so `DBT_TARGET=bq mf ...` works. Run `dbt parse --target bq` first: the
+  semantic manifest holds each target's table names.
+- After editing metrics, a partial parse can report a metric as defined twice. Run
+  `dbt parse --no-partial-parse`.
+
 ## Where tests live
 
 | Kind | Where | What it is |

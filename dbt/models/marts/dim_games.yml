@@ -8,10 +8,23 @@ models:
     config:
       contract:
         enforced: true
+    # Semantic layer: game-level dimensions (day or night, park, series) for any fact
+    # with a game entity, and a count of games played.
+    semantic_model: true
+    agg_time_dimension: official_date
+    metrics:
+      - name: games
+        label: Games
+        description: Completed games. Includes the postseason; filter game__is_postseason to split.
+        agg: sum
+        expr: case when is_completed then 1 else 0 end
     columns:
       # keys
       - name: game_pk
         data_type: bigint
+        entity:
+          name: game
+          type: primary
         description: MLB game id. Primary key; Statcast pitches join on it.
         constraints: [{type: primary_key}]
         data_tests:
@@ -34,6 +47,10 @@ models:
       # when
       - name: official_date
         data_type: date
+        granularity: day
+        # The long form: the shorthand `dimension: time` loses the granularity in dbt 1.12.
+        dimension:
+          type: time
         description: The game's date as MLB records it. Matches Statcast's game_date.
         constraints: [{type: not_null}]
       - name: season
@@ -47,9 +64,11 @@ models:
         description: Scheduled start in the park's local time, from the venue's time zone.
       - name: local_start_hour
         data_type: bigint
+        dimension: categorical
         description: Hour of the local start (0-23). Day games start 11-17, night games 16-20.
       - name: day_night
         data_type: string
+        dimension: categorical
         description: day or night, as MLB classifies the game.
         data_tests:
           - accepted_values:
@@ -66,10 +85,13 @@ models:
                 values: ['R', 'F', 'D', 'L', 'W']
       - name: is_postseason
         data_type: bool
+        dimension: categorical
       - name: series_description
         data_type: string
+        dimension: categorical
       - name: double_header
         data_type: string
+        dimension: categorical
         description: N = not a doubleheader, Y = traditional (one ticket, back to back), S = split (separate admissions).
       - name: game_number
         data_type: bigint
@@ -81,8 +103,10 @@ models:
       # where and who
       - name: venue_name
         data_type: string
+        dimension: categorical
       - name: is_neutral_site
         data_type: bool
+        dimension: categorical
         description: >
           The venue hosted fewer than 20 completed games that season, so it isn't a
           team's home park: Tokyo, London, Seoul, Mexico City, Williamsport, Rickwood,
@@ -95,9 +119,11 @@ models:
         data_type: string
       - name: home_team_abbrev
         data_type: string
+        dimension: categorical
         description: Statcast's abbreviation (NYY, LAD...), the value fct_plate_appearances uses for batting_team. Null when the game has no pitch data.
       - name: away_team_abbrev
         data_type: string
+        dimension: categorical
 
       # status
       - name: status

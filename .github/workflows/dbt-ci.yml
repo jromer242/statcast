@@ -55,6 +55,19 @@ jobs:
         # window), which the first run skips because the table doesn't exist yet.
         run: dbt build --target ci --select fct_batted_balls+
 
+      - name: Validate the semantic layer
+        # MetricFlow checks the semantic models and metrics against each other, then runs
+        # each one against the CI tables, so a metric on a renamed column fails here. The
+        # queries prove the joins to dim_players and dim_games, and a metric from each
+        # fact over the shared metric_time, compile and run. mf has no --target;
+        # profiles.yml reads DBT_TARGET.
+        env:
+          DBT_TARGET: ci
+        run: |
+          mf validate-configs
+          mf query --metrics plate_appearances,home_runs,ops --group-by batter__bats,game__day_night
+          mf query --metrics games,avg_exit_velocity --group-by metric_time__year
+
       - name: Smoke-test the Streamlit app
         # Runs every page headlessly against the committed extracts in app/data/ and
         # fails on any exception.

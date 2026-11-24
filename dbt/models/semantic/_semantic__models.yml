@@ -1,0 +1,10 @@
+models:
+  - name: metricflow_time_spine
+    description: >
+      Daily date spine for the semantic layer. MetricFlow joins metrics to it to roll
+      days up to weeks, months and years.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        granularity: day

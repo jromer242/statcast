@@ -9,9 +9,26 @@ models:
     config:
       contract:
         enforced: true
+    # Semantic layer: one player, reached from a fact as `batter` or `pitcher`. A
+    # semantic model has one primary entity, so the two roles are unique entities on the
+    # same key. Group by batter__full_name or pitcher__full_name.
+    semantic_model: true
+    derived_semantics:
+      entities:
+        - name: batter
+          type: unique
+          description: The player as a hitter.
+          expr: player_id
+        - name: pitcher
+          type: unique
+          description: The player as a pitcher.
+          expr: player_id
     columns:
       - name: player_id
         data_type: bigint
+        entity:
+          name: player
+          type: primary
         description: MLBAM id, the same id Statcast uses for batter_id and pitcher_id. Primary key.
         constraints: [{type: primary_key}]
         data_tests:
@@ -22,6 +39,7 @@ models:
                 enabled: "{{ target.type == 'bigquery' }}"
       - name: full_name
         data_type: string
+        dimension: categorical
         constraints: [{type: not_null}]
       - name: first_name
         data_type: string
@@ -37,6 +55,7 @@ models:
         data_type: date
       - name: birth_country
         data_type: string
+        dimension: categorical
       - name: mlb_debut_date
         data_type: date
       - name: draft_year
@@ -44,6 +63,7 @@ models:
         description: Null for players who signed as international free agents.
       - name: bats
         data_type: string
+        dimension: categorical
         description: L, R or S (switch hitter). The side for a given PA is fct_plate_appearances.batter_stand.
         constraints: [{type: not_null}]
         data_tests:
@@ -52,6 +72,7 @@ models:
                 values: ['L', 'R', 'S']
       - name: throws
         data_type: string
+        dimension: categorical
         description: >
           L or R, or S for the rare ambidextrous thrower (Carlos Cortes, Anthony Seigler
           in 2025-26). The arm on a given pitch is fct_plate_appearances.pitcher_throws.
@@ -62,9 +83,11 @@ models:
                 values: ['L', 'R', 'S']
       - name: primary_position
         data_type: string
+        dimension: categorical
         description: Listed position in the latest season (P, C, 1B, ..., DH, TWP for two-way players).
       - name: position_type
         data_type: string
+        dimension: categorical
         description: Pitcher, Catcher, Infielder, Outfielder, Hitter or Two-Way Player.
       - name: height_in
         data_type: integer
